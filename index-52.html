@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#0b0b0d" />
+  <title>Premium</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; min-height: 100%; background: #0b0b0d; color: #fff; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { min-height: 100vh; min-height: 100dvh; display: flex; justify-content: center; align-items: center; padding: 22px; }
+    .app { width: 100%; max-width: 430px; }
+    .card {
+      position: relative; overflow: hidden; border-radius: 25px; padding: 30px 22px 24px;
+      background: linear-gradient(145deg, #202023, #111113 60%, #171719);
+      border: 1px solid rgba(255, 214, 105, .26);
+      box-shadow: 0 20px 60px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.06);
+    }
+    .card:before { content:""; position:absolute; width:230px; height:230px; border-radius:50%; background:rgba(239,190,66,.08); filter:blur(2px); top:-135px; right:-90px; }
+    .crown { font-size: 42px; line-height: 1; margin-bottom: 10px; filter: drop-shadow(0 4px 8px rgba(255,195,55,.2)); }
+    .label { color: #f6d16b; font-size: 13px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; }
+    .count { margin: 19px 0 0; font-size: clamp(48px, 15vw, 68px); line-height: 1; font-weight: 800; letter-spacing: -2px; color: #fff; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .sub { color: #a8a8ad; margin-top: 10px; font-size: 14px; }
+    .divider { height: 1px; background: rgba(255,255,255,.08); margin: 24px 0 20px; }
+    button {
+      width: 100%; border: 0; border-radius: 15px; padding: 17px 18px;
+      background: linear-gradient(135deg, #f6d36d, #dca72e); color: #17130a;
+      font-size: 16px; font-weight: 850; letter-spacing: .6px; cursor: pointer;
+      box-shadow: 0 8px 24px rgba(221,171,51,.18); transition: transform .12s ease, filter .12s ease;
+    }
+    button:active { transform: scale(.98); filter: brightness(.94); }
+    .unlimited { margin-top: 17px; display: inline-flex; align-items: center; gap: 7px; color: #c6c6ca; font-size: 12px; font-weight: 650; letter-spacing: 1.3px; text-transform: uppercase; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #f1c454; box-shadow: 0 0 8px rgba(241,196,84,.55); }
+    .note { text-align: center; color: #6f6f76; font-size: 12px; margin-top: 18px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="card" aria-label="Premium counter">
+      <div class="crown" aria-hidden="true">👑</div>
+      <div class="label">Premium</div>
+      <div class="count" id="count">0</div>
+      <div class="sub">Ads watched</div>
+      <div class="divider"></div>
+      <button id="watchBtn" type="button">▶ &nbsp; WATCH ADS</button>
+      <div class="unlimited"><span class="dot"></span> Unlimited Count</div>
+    </section>
+    <p class="note">Your count is saved on this device.</p>
+  </main>
+
+  <script>
+    (() => {
+      const STORAGE_COUNT = "premium_ads_count_v1";
+      const STORAGE_PENDING = "premium_ads_pending_v1";
+      const AD_URL = "https://acidic-deal.com/xO7WH6";
+      const countEl = document.getElementById("count");
+      const watchBtn = document.getElementById("watchBtn");
+
+      function getCount() {
+        const value = Number.parseInt(localStorage.getItem(STORAGE_COUNT) || "0", 10);
+        return Number.isFinite(value) && value >= 0 ? value : 0;
+      }
+
+      function render() {
+        countEl.textContent = getCount().toLocaleString();
+      }
+
+      function countReturnOnce() {
+        if (localStorage.getItem(STORAGE_PENDING) !== "1") return;
+        localStorage.removeItem(STORAGE_PENDING);
+        localStorage.setItem(STORAGE_COUNT, String(getCount() + 1));
+        render();
+      }
+
+      watchBtn.addEventListener("click", () => {
+        // Mark a visit as pending. Count it only after the app/page returns to foreground.
+        localStorage.setItem(STORAGE_PENDING, "1");
+        window.open(AD_URL, "_blank");
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") countReturnOnce();
+      });
+      window.addEventListener("pageshow", countReturnOnce);
+      window.addEventListener("focus", countReturnOnce);
+
+      render();
+    })();
+  </script>
+</body>
+</html>
