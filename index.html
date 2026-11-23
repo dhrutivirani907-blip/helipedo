@@ -4,101 +4,376 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#080b12">
-<title>Ad Counter</title>
+<title>Ad Tracker</title>
 <style>
-:root{--bg:#080b12;--panel:#111722;--panel2:#151e2b;--line:rgba(255,255,255,.08);--muted:#8c9aad;--white:#f6f8fc;--green:#54e3a2;--green2:#16b978;--gold:#f7c96b}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#182535 0,transparent 48%),var(--bg);color:var(--white);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;padding:22px}
-.app{width:min(100%,440px)}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:25px}.brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.12em;font-size:14px}.logo{width:38px;height:38px;border-radius:13px;background:linear-gradient(145deg,#69f2b4,#16b978);display:grid;place-items:center;color:#072115;font-weight:900;box-shadow:0 8px 24px #19bd7b35}.status{border:1px solid var(--line);border-radius:30px;padding:8px 11px;color:#aab7c8;font-size:11px;letter-spacing:.08em}.status:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:7px;vertical-align:1px}
-h1{font-size:26px;letter-spacing:-.04em;margin:0 0 8px}.sub{color:var(--muted);font-size:14px;margin:0 0 25px;line-height:1.5}
-.counter-card{position:relative;overflow:hidden;background:linear-gradient(145deg,#172333,#101722 68%);border:1px solid rgba(105,242,180,.15);border-radius:27px;padding:27px 24px 25px;box-shadow:0 24px 70px #0006}.counter-card:before{content:"";position:absolute;right:-70px;top:-100px;width:220px;height:220px;border-radius:50%;background:#36d89115;filter:blur(2px)}.count-label{font-size:12px;letter-spacing:.15em;color:#9bacbf;font-weight:700}.count{font-size:76px;font-weight:850;letter-spacing:-.07em;line-height:1.15;margin:12px 0 6px;background:linear-gradient(180deg,#fff,#c7d6e7);-webkit-background-clip:text;color:transparent;font-variant-numeric:tabular-nums}.count-caption{font-size:13px;color:#9bacbf}.progress-wrap{margin-top:23px}.progress-head{display:flex;justify-content:space-between;font-size:12px;color:#9bacbf;margin-bottom:9px}.progress{height:6px;border-radius:10px;background:#283342;overflow:hidden}.bar{height:100%;width:0;background:linear-gradient(90deg,#2bc884,#8bf5c5);border-radius:10px;transition:width .35s}.break-note{display:flex;align-items:center;gap:8px;color:#8293a8;font-size:12px;margin-top:12px}.action{width:100%;border:0;border-radius:17px;margin-top:17px;padding:18px 15px;background:linear-gradient(135deg,#56e6a6,#20c17e);color:#062418;font-weight:850;font-size:16px;letter-spacing:.01em;box-shadow:0 12px 32px #24c98225;cursor:pointer;transition:transform .12s,filter .2s}.action:active{transform:scale(.985)}.action:disabled{background:linear-gradient(135deg,#273443,#1b2633);color:#9eacbd;box-shadow:none;cursor:not-allowed}.button-icon{font-size:17px;margin-right:7px}.secondary{margin-top:18px;display:flex;justify-content:space-between;color:#718197;font-size:11px;letter-spacing:.04em}.modal-backdrop{position:fixed;inset:0;background:#02050bcc;backdrop-filter:blur(9px);display:none;align-items:center;justify-content:center;padding:22px;z-index:9}.modal-backdrop.show{display:flex}.modal{width:min(100%,350px);background:linear-gradient(145deg,#182333,#101720);border:1px solid var(--line);border-radius:25px;padding:27px 24px;text-align:center;box-shadow:0 30px 90px #0009;animation:pop .22s ease-out}.modal-icon{width:58px;height:58px;border-radius:18px;margin:0 auto 15px;background:#1d3a31;display:grid;place-items:center;color:var(--green);font-size:25px}.modal h2{font-size:19px;margin:0 0 9px}.modal p{font-size:13px;color:#9eacbd;line-height:1.6;margin:0 0 21px}.modal button{width:100%;padding:13px;border-radius:13px;border:1px solid #ffffff15;background:#202c3a;color:white;font-weight:750;cursor:pointer}.modal button.primary{background:var(--green);border:0;color:#062418}.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom));left:50%;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#182635;border:1px solid #ffffff16;border-radius:15px;padding:12px 16px;color:#e8f5ee;font-size:13px;box-shadow:0 15px 40px #0007;transition:.25s;z-index:10;white-space:nowrap}.toast.show{opacity:1;transform:translate(-50%,0)}@keyframes pop{from{transform:translateY(8px) scale(.97);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
-@media(max-width:380px){.count{font-size:66px}.counter-card{padding:23px 20px}}
+:root{--bg:#080b12;--panel:#111722;--panel2:#151e2b;--line:rgba(255,255,255,.08);--muted:#8c9aad;--white:#f6f8fc;--green:#54e3a2;--green2:#16b978;--red:#ff6f7d}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#182535 0,transparent 48%),var(--bg);color:var(--white);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:22px}
+button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:25px}.brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.12em;font-size:14px}.logo{width:38px;height:38px;border-radius:13px;background:linear-gradient(145deg,#69f2b4,#16b978);display:grid;place-items:center;color:#072115;font-weight:900;box-shadow:0 8px 24px #19bd7b35}.status{border:1px solid var(--line);border-radius:30px;padding:8px 11px;color:#aab7c8;font-size:11px;letter-spacing:.08em}.status:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:7px;vertical-align:1px}.profile{width:42px;height:42px;border-radius:14px;border:1px solid var(--line);background:#121c28;color:white;cursor:pointer;font-size:20px;display:grid;place-items:center}.profile:hover{border-color:#54e3a277}h1{font-size:26px;letter-spacing:-.04em;margin:0 0 8px}.sub{color:var(--muted);font-size:14px;margin:0 0 25px;line-height:1.5}.counter-card{position:relative;overflow:hidden;background:linear-gradient(145deg,#172333,#101722 68%);border:1px solid rgba(105,242,180,.15);border-radius:27px;padding:27px 24px 25px;box-shadow:0 24px 70px #0006}.counter-card:before{content:"";position:absolute;right:-70px;top:-100px;width:220px;height:220px;border-radius:50%;background:#36d89115;filter:blur(2px)}.count-label{font-size:12px;letter-spacing:.15em;color:#9bacbf;font-weight:700}.count{font-size:76px;font-weight:850;letter-spacing:-.07em;line-height:1.15;margin:12px 0 6px;background:linear-gradient(180deg,#fff,#c7d6e7);-webkit-background-clip:text;color:transparent;font-variant-numeric:tabular-nums}.count-caption{font-size:13px;color:#9bacbf}.progress-wrap{margin-top:23px}.progress-head{display:flex;justify-content:space-between;font-size:12px;color:#9bacbf;margin-bottom:9px}.progress{height:6px;border-radius:10px;background:#283342;overflow:hidden}.bar{height:100%;width:0;background:linear-gradient(90deg,#2bc884,#8bf5c5);border-radius:10px;transition:width .35s}.break-note{display:flex;align-items:center;gap:8px;color:#8293a8;font-size:12px;margin-top:12px}.action{width:100%;border:0;border-radius:17px;margin-top:17px;padding:18px 15px;background:linear-gradient(135deg,#56e6a6,#20c17e);color:#062418;font-weight:850;font-size:16px;letter-spacing:.01em;box-shadow:0 12px 32px #24c98225;cursor:pointer;transition:transform .12s,filter .2s}.action:active{transform:scale(.985)}.action:disabled{background:linear-gradient(135deg,#273443,#1b2633);color:#9eacbd;box-shadow:none;cursor:not-allowed}.button-icon{font-size:17px;margin-right:7px}.secondary{margin-top:18px;display:flex;justify-content:space-between;color:#718197;font-size:11px;letter-spacing:.04em}.modal-backdrop{position:fixed;inset:0;background:#02050bcc;backdrop-filter:blur(9px);display:none;align-items:center;justify-content:center;padding:22px;z-index:20}.modal-backdrop.show{display:flex}.modal{width:min(100%,360px);background:linear-gradient(145deg,#182333,#101720);border:1px solid var(--line);border-radius:25px;padding:27px 24px;text-align:center;box-shadow:0 30px 90px #0009;animation:pop .22s ease-out}.modal-icon{width:58px;height:58px;border-radius:18px;margin:0 auto 15px;background:#1d3a31;display:grid;place-items:center;color:var(--green);font-size:25px}.modal h2{font-size:19px;margin:0 0 9px}.modal p{font-size:13px;color:#9eacbd;line-height:1.6;margin:0 0 21px}.field{width:100%;padding:14px 15px;border-radius:13px;border:1px solid #ffffff12;background:#0b111a;color:white;outline:none;margin-bottom:11px}.field:focus{border-color:#54e3a277}.modal button{width:100%;padding:13px;border-radius:13px;border:1px solid #ffffff15;background:#202c3a;color:white;font-weight:750;cursor:pointer}.modal button.primary{background:var(--green);border:0;color:#062418}.modal button.danger{background:#3a1e25;color:#ffb8c0;border-color:#ff6f7d33}.modal button+button{margin-top:9px}.hidden{display:none!important}.checking{display:flex;flex-direction:column;align-items:center;gap:14px}.spinner{width:38px;height:38px;border-radius:50%;border:3px solid #ffffff15;border-top-color:var(--green);animation:spin .8s linear infinite}.admin-list{max-height:360px;overflow:auto;text-align:left;margin:15px -5px 0;padding:0 5px}.user-row{padding:14px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}.user-info{min-width:0}.user-name{font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.user-ads{font-size:12px;color:#8fa0b3;margin-top:4px}.reset{width:auto!important;padding:9px 12px!important;border-radius:10px!important;background:#2b1820!important;color:#ff9eaa!important;border:1px solid #ff6f7d33!important;flex:none}.admin-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.admin-head h2{margin:0}.small{font-size:11px;color:#7f91a5}.error{color:#ff9eaa!important}.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom));left:50%;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#182635;border:1px solid #ffffff16;border-radius:15px;padding:12px 16px;color:#e8f5ee;font-size:13px;box-shadow:0 15px 40px #0007;transition:.25s;z-index:30;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}@keyframes pop{from{transform:translateY(8px) scale(.97);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:380px){.count{font-size:66px}.counter-card{padding:23px 20px}}
 </style>
 </head>
 <body>
 <main class="app">
-  <header class="top"><div class="brand"><div class="logo">A</div> AD TRACKER</div><div class="status">LOCAL MODE</div></header>
-  <h1>Your ad activity</h1><p class="sub">Watch an ad and return after at least 8 seconds to record your progress.</p>
-  <section class="counter-card">
-    <div class="count-label">TOTAL ADS WATCHED</div>
-    <div class="count" id="count">0</div>
-    <div class="count-caption">Ads completed on this device</div>
-    <div class="progress-wrap"><div class="progress-head"><span id="progressLabel">Progress to break</span><span id="progressNum">0 / 100</span></div><div class="progress"><div class="bar" id="bar"></div></div></div>
-    <div class="break-note"><span>◇</span><span>2-minute break after every 100 ads</span></div>
-  </section>
-  <button class="action" id="watch"><span class="button-icon">▶</span>Watch Ads</button>
-  <div class="secondary"><span>DEVICE STORAGE</span><span>Saved automatically</span></div>
+<header class="top">
+  <div class="brand"><div class="logo">A</div> AD TRACKER</div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div class="status" id="status">CONNECTING</div>
+    <button class="profile" id="profileBtn" aria-label="Profile">♙</button>
+  </div>
+</header>
+<h1>Your ad activity</h1>
+<p class="sub">Watch an ad and return after at least 8 seconds to record your progress.</p>
+<section class="counter-card">
+  <div class="count-label">TOTAL ADS WATCHED</div>
+  <div class="count" id="count">0</div>
+  <div class="count-caption">Ads completed on your backend account</div>
+  <div class="progress-wrap">
+    <div class="progress-head"><span id="progressLabel">Progress to break</span><span id="progressNum">0 / 100</span></div>
+    <div class="progress"><div class="bar" id="bar"></div></div>
+  </div>
+  <div class="break-note"><span>◇</span><span>2-minute break after every 100 ads</span></div>
+</section>
+<button class="action" id="watch"><span class="button-icon">▶</span>Watch Ads</button>
+<div class="secondary"><span>BACKEND ACCOUNT</span><span id="accountName">Not connected</span></div>
 </main>
-<div class="modal-backdrop" id="modal"><div class="modal"><div class="modal-icon" id="modalIcon">✓</div><h2 id="modalTitle">Updated</h2><p id="modalText">Your count has been updated.</p><button class="primary" id="modalClose">Close</button></div></div>
+
+<!-- Account popup -->
+<div class="modal-backdrop" id="accountModal">
+  <div class="modal" id="accountBox">
+    <div class="modal-icon">A</div>
+    <h2 id="accountTitle">Enter Your Name</h2>
+    <p id="accountText">Create your job account. Your ad count will be stored securely on the server.</p>
+    <input class="field" id="nameInput" maxlength="40" autocomplete="name" placeholder="Enter your name">
+    <button class="primary" id="accountAction">Save</button>
+    <p class="small" id="accountError"></p>
+  </div>
+</div>
+
+<!-- Checking popup -->
+<div class="modal-backdrop" id="checkingModal">
+  <div class="modal">
+    <div class="checking">
+      <div class="spinner"></div>
+      <h2 style="margin:0">Checking Your Job Account</h2>
+      <p style="margin:0">Please wait while we securely check your backend account.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Profile popup -->
+<div class="modal-backdrop" id="profileModal">
+  <div class="modal">
+    <div class="modal-icon">♙</div>
+    <h2>Profile</h2>
+    <p id="profileInfo">Not connected</p>
+    <button class="primary" id="adminOpen">Admin Panel</button>
+    <button id="logoutBtn">Change Account</button>
+    <button id="profileClose">Close</button>
+  </div>
+</div>
+
+<!-- Admin password -->
+<div class="modal-backdrop" id="adminLoginModal">
+  <div class="modal">
+    <div class="modal-icon">🔐</div>
+    <h2>Admin Access</h2>
+    <p>Enter the admin password. The password is verified by the backend and is never stored in this app.</p>
+    <input class="field" id="adminPassword" type="password" autocomplete="current-password" placeholder="Admin password">
+    <button class="primary" id="adminLogin">Continue</button>
+    <button id="adminLoginClose">Cancel</button>
+    <p class="small error" id="adminError"></p>
+  </div>
+</div>
+
+<!-- Admin panel -->
+<div class="modal-backdrop" id="adminModal">
+  <div class="modal" style="max-width:410px">
+    <div class="admin-head">
+      <h2>Admin Panel</h2>
+      <button id="adminRefresh" style="width:auto;padding:8px 11px">↻</button>
+    </div>
+    <div class="small" id="adminSummary">Loading users...</div>
+    <div class="admin-list" id="adminList"></div>
+    <button id="adminClose">Close</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
+
 <script>
 (() => {
+  const API_BASE = "https://helipedo.onrender.com";
   const AD_URL = "https://asiafilm.org/4/17d6a856c8a2251142b070b3c3d63131";
   const MIN_SECONDS = 8, BREAK_SECONDS = 120, EVERY_ADS = 100;
-  const STORAGE_KEY = "adtracker_state_v1";
-  const DB_NAME = "AdTrackerPersistentDB", DB_STORE = "state";
-  const countEl = document.getElementById("count"), watchBtn = document.getElementById("watch");
-  const bar = document.getElementById("bar"), progressNum = document.getElementById("progressNum");
-  const progressLabel = document.getElementById("progressLabel");
-  const modal = document.getElementById("modal"), modalIcon = document.getElementById("modalIcon");
-  const modalTitle = document.getElementById("modalTitle"), modalText = document.getElementById("modalText");
-  let state = {count:0,breakUntil:0}, pending = null, tickTimer = null, toastTimer = null;
 
-  function openDB(){return new Promise((resolve,reject)=>{if(!("indexedDB" in window))return resolve(null);const req=indexedDB.open(DB_NAME,1);req.onupgradeneeded=()=>req.result.createObjectStore(DB_STORE);req.onsuccess=()=>resolve(req.result);req.onerror=()=>resolve(null);});}
-  let dbPromise=openDB();
-  async function persist(){
-    const snap={count:Math.max(0,Math.floor(state.count||0)),breakUntil:Math.max(0,Math.floor(state.breakUntil||0))};
-    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(snap));}catch(e){}
-    const db=await dbPromise;if(db)try{await new Promise((res,rej)=>{const tx=db.transaction(DB_STORE,"readwrite");tx.objectStore(DB_STORE).put(snap,"main");tx.oncomplete=res;tx.onerror=rej;});}catch(e){}
+  const countEl = document.getElementById("count");
+  const watchBtn = document.getElementById("watch");
+  const bar = document.getElementById("bar");
+  const progressNum = document.getElementById("progressNum");
+  const progressLabel = document.getElementById("progressLabel");
+  const statusEl = document.getElementById("status");
+  const accountNameEl = document.getElementById("accountName");
+
+  const accountModal = document.getElementById("accountModal");
+  const checkingModal = document.getElementById("checkingModal");
+  const profileModal = document.getElementById("profileModal");
+  const adminLoginModal = document.getElementById("adminLoginModal");
+  const adminModal = document.getElementById("adminModal");
+
+  let account = null;
+  let pending = null;
+  let breakUntil = 0;
+  let tickTimer = null;
+  let toastTimer = null;
+  let adminToken = null;
+
+  function show(el){el.classList.add("show")}
+  function hide(el){el.classList.remove("show")}
+  function toast(msg){
+    const el=document.getElementById("toast");
+    el.textContent=msg;el.classList.add("show");
+    clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("show"),2500);
   }
-  async function load(){
-    let local=null;try{local=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");}catch(e){}
-    const db=await dbPromise;let indexed=null;
-    if(db)try{indexed=await new Promise((res,rej)=>{const req=db.transaction(DB_STORE,"readonly").objectStore(DB_STORE).get("main");req.onsuccess=()=>res(req.result||null);req.onerror=rej;});}catch(e){}
-    // Recover from whichever local copy has the higher count.
-    const best=[local,indexed].filter(x=>x&&Number.isFinite(+x.count)).sort((a,b)=>(+b.count)-(+a.count))[0];
-    if(best)state={count:Math.max(0,Math.floor(+best.count||0)),breakUntil:Math.max(+best.breakUntil||0,0)};
-    render();persist();startTicker();
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
   }
-  function showModal(title,message,icon="✓"){modalTitle.textContent=title;modalText.textContent=message;modalIcon.textContent=icon;modal.classList.add("show");}
-  function closeModal(){modal.classList.remove("show");}
-  function toast(msg){const el=document.getElementById("toast");el.textContent=msg;el.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("show"),2300);}
-  function secondsLeft(){return Math.max(0,Math.ceil((state.breakUntil-Date.now())/1000));}
-  function formatTime(sec){const m=Math.floor(sec/60),s=sec%60;return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;}
+  async function api(path, options={}){
+    const opts={...options,credentials:"include",headers:{"Content-Type":"application/json",...(options.headers||{})}};
+    const response=await fetch(API_BASE+path,opts);
+    let data=null;
+    try{data=await response.json()}catch{}
+    if(!response.ok) throw new Error(data?.error || "Server request failed.");
+    return data;
+  }
+
+  function secondsLeft(){return Math.max(0,Math.ceil((breakUntil-Date.now())/1000))}
+  function formatTime(sec){const m=Math.floor(sec/60),s=sec%60;return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`}
+
   function render(){
-    countEl.textContent=state.count.toLocaleString();
-    const progress=state.count%EVERY_ADS;bar.style.width=progress+"%";progressNum.textContent=`${progress} / ${EVERY_ADS}`;
+    const count=Number(account?.adsCount||0);
+    countEl.textContent=count.toLocaleString();
+    const progress=count%EVERY_ADS;
+    bar.style.width=progress+"%";
+    progressNum.textContent=`${progress} / ${EVERY_ADS}`;
+    accountNameEl.textContent=account?.name||"Not connected";
     const left=secondsLeft();
-    if(left>0){watchBtn.disabled=true;watchBtn.innerHTML=`<span class="button-icon">🔒</span>Break · ${formatTime(left)}`;progressLabel.textContent="Break timer";}
-    else{watchBtn.disabled=!!pending;watchBtn.innerHTML=pending?'<span class="button-icon">↗</span>Ad opened…':'<span class="button-icon">▶</span>Watch Ads';progressLabel.textContent="Progress to break";}
+    if(left>0){
+      watchBtn.disabled=true;
+      watchBtn.innerHTML=`<span class="button-icon">🔒</span>Break · ${formatTime(left)}`;
+      progressLabel.textContent="Break timer";
+    }else{
+      watchBtn.disabled=!account || !!pending;
+      watchBtn.innerHTML=pending
+        ? '<span class="button-icon">↗</span>Ad opened…'
+        : '<span class="button-icon">▶</span>Watch Ads';
+      progressLabel.textContent="Progress to break";
+    }
+    document.getElementById("profileInfo").textContent=account
+      ? `Name: ${account.name}\nTotal ads: ${Number(account.adsCount).toLocaleString()}`
+      : "No account connected.";
   }
-  function startTicker(){clearInterval(tickTimer);tickTimer=setInterval(()=>{if(state.breakUntil&&secondsLeft()===0){state.breakUntil=0;persist();render();toast("Break finished — unlocked!");}else render();},500);}
-  function openAd(){
-    if(pending||secondsLeft()>0)return;
-    const started=Date.now();pending={started,openedAt:started};
-    // Keep it user-gesture initiated. If blocked, show the same URL in a new tab attempt.
-    let opened=window.open(AD_URL,"_blank");
-    if(!opened){pending=null;render();showModal("Allow pop-ups","Please allow pop-ups for this app, then tap Watch Ads again.","!");return;}
+
+  async function refreshAccount(){
+    try{
+      const data=await api("/api/account/me");
+      account=data.account;
+      statusEl.textContent="SECURE • ONLINE";
+      render();
+      return true;
+    }catch{
+      account=null;
+      statusEl.textContent="ACCOUNT REQUIRED";
+      render();
+      return false;
+    }
+  }
+
+  async function boot(){
+    try{
+      const session=await api("/api/session");
+      if(session.hasSession){
+        // Requirement: popup appears every time. Returning users get Check.
+        document.getElementById("accountTitle").textContent="Enter Your Name";
+        document.getElementById("accountText").textContent="Enter the same name used for your backend job account.";
+        document.getElementById("accountAction").textContent="Check";
+        document.getElementById("accountError").textContent="";
+        show(accountModal);
+      }else{
+        document.getElementById("accountTitle").textContent="Enter Your Name";
+        document.getElementById("accountText").textContent="Create your job account. Your ad count will be stored securely on the server.";
+        document.getElementById("accountAction").textContent="Save";
+        document.getElementById("accountError").textContent="";
+        show(accountModal);
+      }
+      statusEl.textContent="READY";
+    }catch{
+      statusEl.textContent="SERVER ERROR";
+      toast("Could not connect to backend.");
+      show(accountModal);
+    }
     render();
-    // Some browsers may return while tab remains open; count only when the app resumes after >=8 sec.
   }
-  function checkReturn(){
+
+  async function saveOrCheck(){
+    const input=document.getElementById("nameInput");
+    const error=document.getElementById("accountError");
+    const name=input.value.trim();
+    if(name.length<2){error.textContent="Please enter your name.";return}
+    const action=document.getElementById("accountAction");
+    action.disabled=true; error.textContent="";
+    hide(accountModal); show(checkingModal);
+
+    try{
+      // Determine mode from whether a backend session exists.
+      const session=await api("/api/session");
+      const endpoint=session.hasSession ? "/api/account/check" : "/api/account";
+      const data=await api(endpoint,{method:"POST",body:JSON.stringify({name})});
+      account=data.account;
+      breakUntil=0;
+      hide(checkingModal);
+      statusEl.textContent="SECURE • ONLINE";
+      render();
+      toast(session.hasSession ? "Account verified." : "Account created successfully.");
+    }catch(err){
+      hide(checkingModal);
+      error.textContent=err.message;
+      show(accountModal);
+    }finally{
+      action.disabled=false;
+    }
+  }
+
+  function openAd(){
+    if(!account || pending || secondsLeft()>0)return;
+    const started=Date.now();
+    pending={started};
+    const opened=window.open(AD_URL,"_blank");
+    if(!opened){
+      pending=null;render();
+      toast("Please allow pop-ups, then tap Watch Ads again.");
+      return;
+    }
+    render();
+  }
+
+  async function checkReturn(){
     if(!pending)return;
     const elapsed=(Date.now()-pending.started)/1000;
-    if(elapsed<MIN_SECONDS){pending=null;render();showModal("Not counted","You did not watch for the minimum 8 seconds. Try again.","!");return;}
-    pending=null;state.count++;
-    if(state.count%EVERY_ADS===0){state.breakUntil=Date.now()+BREAK_SECONDS*1000;persist();render();showModal("100 ads completed!","Your total is "+state.count+". A 2-minute break has started. The Watch Ads button is locked until it ends.","🔒");}
-    else{persist();render();showModal("Count updated","1 ad counted. Your total is now "+state.count+".","✓");}
+    if(elapsed<MIN_SECONDS){
+      pending=null;render();
+      toast("Not counted — minimum watch time is 8 seconds.");
+      return;
+    }
+    pending=null;
+    try{
+      const data=await api("/api/account/me/increment-ad",{method:"POST",body:"{}"});
+      account=data.account;
+      if(account.adsCount % EVERY_ADS===0){
+        breakUntil=Date.now()+BREAK_SECONDS*1000;
+        render();
+        toast("100 ads completed. 2-minute break started.");
+      }else{
+        render();
+        toast("1 ad counted.");
+      }
+    }catch(err){
+      render();
+      toast(err.message);
+    }
   }
-  // Start time is persisted, so the app can recover a pending return if it was backgrounded.
-  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&pending)checkReturn();});
-  window.addEventListener("focus",()=>{if(pending)checkReturn();});
-  window.addEventListener("pageshow",()=>{if(pending)checkReturn();});
-  watchBtn.addEventListener("click",openAd);
-  document.getElementById("modalClose").addEventListener("click",closeModal);
-  modal.addEventListener("click",e=>{if(e.target===modal)closeModal();});
-  // Local data protection: restore from IndexedDB backup and keep both copies in sync.
-  window.addEventListener("storage",e=>{if(e.key===STORAGE_KEY&&e.newValue){try{const incoming=JSON.parse(e.newValue);if(+incoming.count>state.count){state.count=+incoming.count;state.breakUntil=Math.max(state.breakUntil,+incoming.breakUntil||0);render();}}catch(e){}}});
-  load();
+
+  async function adminLogin(){
+    const password=document.getElementById("adminPassword").value;
+    const error=document.getElementById("adminError");
+    if(!password){error.textContent="Enter the admin password.";return}
+    error.textContent="";
+    try{
+      const data=await api("/api/admin/login",{method:"POST",body:JSON.stringify({password})});
+      adminToken=data.adminToken;
+      document.getElementById("adminPassword").value="";
+      hide(adminLoginModal);
+      show(adminModal);
+      await loadUsers();
+    }catch(err){error.textContent=err.message}
+  }
+
+  async function loadUsers(){
+    const list=document.getElementById("adminList");
+    const summary=document.getElementById("adminSummary");
+    list.innerHTML="<div class='small'>Loading users...</div>";
+    try{
+      const data=await api("/api/admin/users",{headers:{"x-admin-token":adminToken}});
+      summary.textContent=`${data.users.length} registered user${data.users.length===1?"":"s"}`;
+      if(!data.users.length){list.innerHTML="<div class='small'>No users yet.</div>";return}
+      list.innerHTML=data.users.map(user=>`
+        <div class="user-row">
+          <div class="user-info">
+            <div class="user-name">${escapeHtml(user.name)}</div>
+            <div class="user-ads">${Number(user.adsCount).toLocaleString()} ads watched</div>
+          </div>
+          <button class="reset" data-reset="${user.id}">Reset</button>
+        </div>
+      `).join("");
+      list.querySelectorAll("[data-reset]").forEach(btn=>{
+        btn.addEventListener("click",()=>resetUser(btn.dataset.reset,btn));
+      });
+    }catch(err){
+      summary.textContent="Unable to load users.";
+      list.innerHTML=`<div class="small error">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function resetUser(id,btn){
+    if(!confirm("Reset this user's total ad count to 0?"))return;
+    btn.disabled=true;
+    try{
+      await api("/api/admin/users/"+encodeURIComponent(id)+"/reset",{
+        method:"POST",
+        headers:{"x-admin-token":adminToken},
+        body:"{}"
+      });
+      toast("User ad count reset to 0.");
+      if(account && String(account.id)===String(id)){
+        account.adsCount=0;breakUntil=0;render();
+      }
+      await loadUsers();
+    }catch(err){toast(err.message);btn.disabled=false}
+  }
+
+  document.getElementById("accountAction").addEventListener("click",saveOrCheck);
+  document.getElementById("nameInput").addEventListener("keydown",e=>{if(e.key==="Enter")saveOrCheck()});
+  document.getElementById("watch").addEventListener("click",openAd);
+
+  document.getElementById("profileBtn").addEventListener("click",()=>show(profileModal));
+  document.getElementById("profileClose").addEventListener("click",()=>hide(profileModal));
+  document.getElementById("adminOpen").addEventListener("click",()=>{hide(profileModal);show(adminLoginModal)});
+  document.getElementById("adminLoginClose").addEventListener("click",()=>hide(adminLoginModal));
+  document.getElementById("adminLogin").addEventListener("click",adminLogin);
+  document.getElementById("adminPassword").addEventListener("keydown",e=>{if(e.key==="Enter")adminLogin()});
+  document.getElementById("adminClose").addEventListener("click",()=>hide(adminModal));
+  document.getElementById("adminRefresh").addEventListener("click",loadUsers);
+
+  document.getElementById("logoutBtn").addEventListener("click",async()=>{
+    try{await api("/api/logout",{method:"POST"})}catch{}
+    account=null;adminToken=null;
+    hide(profileModal);
+    document.getElementById("accountTitle").textContent="Enter Your Name";
+    document.getElementById("accountText").textContent="Create your job account. Your ad count will be stored securely on the server.";
+    document.getElementById("accountAction").textContent="Save";
+    document.getElementById("nameInput").value="";
+    render();show(accountModal);
+  });
+
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&pending)checkReturn()});
+  window.addEventListener("focus",()=>{if(pending)checkReturn()});
+  window.addEventListener("pageshow",()=>{if(pending)checkReturn()});
+
+  clearInterval(tickTimer);
+  tickTimer=setInterval(()=>{
+    if(breakUntil && secondsLeft()===0){breakUntil=0;toast("Break finished — unlocked!")}
+    render();
+  },500);
+
+  boot();
 })();
 </script>
 </body>
