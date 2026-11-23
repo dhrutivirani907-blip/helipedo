@@ -112,6 +112,410 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  // Update this URL only if your deployed backend changes.
+  const API = "https://zon-of-insta-1.onrender.com";
+  const AD_URL = "https://asiafilm.org/4/17d6a856c8a2251142b070b3c3d63131";
+  const MIN_WATCH_MS = 8000;
+  const BREAK_EVERY = 100;
+  const BREAK_MS = 120000;
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    status: $("status"), count: $("count"), progressLabel: $("progressLabel"),
+    progressNum: $("progressNum"), bar: $("bar"), watch: $("watch"),
+    accountName: $("accountName"), accountModal: $("accountModal"),
+    accountTitle: $("accountTitle"), accountText: $("accountText"),
+    nameInput: $("nameInput"), accountAction: $("accountAction"),
+    accountError: $("accountError"), checkingModal: $("checkingModal"),
+    profileBtn: $("profileBtn"), profileModal: $("profileModal"),
+    profileInfo: $("profileInfo"), adminOpen: $("adminOpen"),
+    logoutBtn: $("logoutBtn"), profileClose: $("profileClose"),
+    adminLoginModal: $("adminLoginModal"), adminPassword: $("adminPassword"),
+    adminLogin: $("adminLogin"), adminLoginClose: $("adminLoginClose"),
+    adminError: $("adminError"), adminModal: $("adminModal"),
+    adminSummary: $("adminSummary"), adminList: $("adminList"),
+    adminRefresh: $("adminRefresh"), adminClose: $("adminClose"),
+    resultModal: $("resultModal"), resultIcon: $("resultIcon"),
+    resultTitle: $("resultTitle"), resultText: $("resultText"),
+    resultClose: $("resultClose"), toast: $("toast")
+  };
+
+  let account = null;
+  let adminToken = "";
+  let pendingAd = null;
+  let accountBusy = false;
+  let adminBusy = false;
+  let adBusy = false;
+  let toastTimer;
+  let breakUntil = 0;
+
+  const storage = {
+    get(key) { try { return localStorage.getItem(key) || ""; } catch { return ""; } },
+    set(key, val) { try { localStorage.setItem(key, val); } catch {} },
+    remove(key) { try { localStorage.removeItem(key); } catch {} }
+  };
+
+  const token = () => storage.get("adtracker_session_token");
+  const setToken = (t) => storage.set("adtracker_session_token", t || "");
+  const clearToken = () => storage.remove("adtracker_session_token");
+
+  function showModal(id) { $(id)?.classList.add("show"); }
+  function hideModal(id) { $(id)?.classList.remove("show"); }
+  function toast(message) {
+    if (!els.toast) return;
+    els.toast.textContent = message;
+    els.toast.style.opacity = "1";
+    els.toast.style.transform = "translate(-50%,0)";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      els.toast.style.opacity = "0";
+      els.toast.style.transform = "translate(-50%,20px)";
+    }, 2600);
+  }
+
+  async function api(path, options = {}) {
+    const headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
+    if (token()) headers["X-Account-Token"] = token();
+    if (adminToken) headers["X-Admin-Token"] = adminToken;
+    const response = await fetch(API + path, {
+      ...options, headers, credentials: "include"
+    });
+    let data;
+    try { data = await response.json(); }
+    catch { data = { ok: false, error: `Server returned HTTP ${response.status}` }; }
+    if (!response.ok || data?.ok === false) {
+      const err = new Error(data?.error || `Request failed (${response.status})`);
+      err.status = response.status;
+      throw err;
+    }
+    return data;
+  }
+
+  function setAccount(data) {
+    account = data;
+    if (data?.name) {
+      els.accountName.textContent = data.name;
+      els.profileInfo.textContent = `${data.name} · ${Number(data.adsCount || 0).toLocaleString()} ads watched`;
+    }
+    renderCount(Number(data?.adsCount || 0));
+    els.status.textContent = "CONNECTED";
+    els.status.style.color = "var(--green)";
+    els.watch.disabled = false;
+  }
+
+  function renderCount(count) {
+    count = Math.max(0, Number(count) || 0);
+    els.count.textContent = count.toLocaleString();
+    const remainder = count % BREAK_EVERY;
+    const pct = remainder / BREAK_EVERY * 100;
+    els.progressNum.textContent = `${remainder} / ${BREAK_EVERY}`;
+    els.bar.style.width = `${pct}%`;
+    if (count > 0 && remainder === 0) {
+      els.progressLabel.textContent = "Break earned";
+      els.bar.style.width = "100%";
+    } else {
+      els.progressLabel.textContent = "Progress to break";
+    }
+  }
+
+  function accountPopup(mode = "create") {
+    accountBusy = false;
+    els.accountError.textContent = "";
+    els.nameInput.value = "";
+    els.accountTitle.textContent = mode === "check" ? "Check Your Account" : "Enter Your Name";
+    els.accountText.textContent = mode === "check"
+      ? "Enter the same name you used previously to reconnect to your account."
+      : "Create your job account. Your ad count will be stored on the server.";
+    els.accountAction.textContent = mode === "check" ? "Check Account" : "Save";
+    els.accountAction.dataset.mode = mode;
+    showModal("accountModal");
+    setTimeout(() => els.nameInput.focus(), 120);
+  }
+
+  async function saveOrCheckAccount() {
+    if (accountBusy) return;
+    const name = els.nameInput.value.trim();
+    accountBusy = true;
+    els.accountAction.disabled = true;
+    els.accountError.textContent = "";
+    showModal("checkingModal");
+    hideModal("accountModal");
+    try {
+      let data;
+      const mode = els.accountAction.dataset.mode || "create";
+      if (mode === "check") {
+        data = await api("/api/account/check", { method: "POST", body: JSON.stringify({ name }) });
+      } else {
+        try {
+          data = await api("/api/account", { method: "POST", body: JSON.stringify({ name }) });
+        } catch (err) {
+          // If the name already exists, try to reconnect rather than strand the user.
+          if (err.status === 409) data = await api("/api/account/check", { method: "POST", body: JSON.stringify({ name }) });
+          else throw err;
+        }
+      }
+      if (data.sessionToken) setToken(data.sessionToken);
+      setAccount(data.account);
+      hideModal("checkingModal");
+      hideModal("accountModal");
+      toast("Account connected successfully");
+    } catch (err) {
+      hideModal("checkingModal");
+      showModal("accountModal");
+      els.accountError.textContent = err.message || "Could not connect account.";
+    } finally {
+      accountBusy = false;
+      els.accountAction.disabled = false;
+    }
+  }
+
+  async function loadSession() {
+    els.watch.disabled = true;
+    els.status.textContent = "CONNECTING";
+    try {
+      if (token()) {
+        const data = await api("/api/account/me");
+        setAccount(data.account);
+        return;
+      }
+      const sess = await api("/api/session");
+      if (sess.hasSession) {
+        const me = await api("/api/account/me");
+        setAccount(me.account);
+      } else {
+        els.status.textContent = "NOT CONNECTED";
+        els.accountName.textContent = "Not connected";
+        accountPopup("create");
+      }
+    } catch (err) {
+      if (err.status === 401) {
+        clearToken();
+        accountPopup("check");
+      } else {
+        els.status.textContent = "OFFLINE";
+        els.status.style.color = "var(--red)";
+        els.accountName.textContent = "Connection problem";
+        toast(err.message || "Backend connection failed");
+        // Give the user a way to enter/reconnect while API is unavailable.
+        accountPopup("check");
+      }
+    }
+  }
+
+  async function beginAd() {
+    if (!account || adBusy) {
+      if (!account) accountPopup("check");
+      return;
+    }
+    if (Date.now() < breakUntil) {
+      toast(`Break time: ${Math.ceil((breakUntil - Date.now()) / 1000)} seconds left`);
+      return;
+    }
+    adBusy = true;
+    els.watch.disabled = true;
+    els.watch.innerHTML = '<span class="button-icon">⌛</span>Opening Ad...';
+    // Open a tab synchronously from the click to avoid popup blockers.
+    let adWindow = null;
+    try { adWindow = window.open("about:blank", "_blank"); } catch {}
+    try {
+      const start = await api("/api/account/me/start-ad", { method: "POST", body: "{}" });
+      pendingAd = { adToken: start.adToken, startedAt: Date.now() };
+      storage.set("adtracker_pending_ad", JSON.stringify(pendingAd));
+      if (adWindow && !adWindow.closed) {
+        adWindow.location.href = AD_URL;
+      } else {
+        // Popup-blocker fallback; account and pending ad are saved locally.
+        window.location.href = AD_URL;
+      }
+      toast("Return to this app after at least 8 seconds");
+      setTimeout(() => {
+        if (!document.hidden) completeAdIfReady();
+      }, MIN_WATCH_MS + 100);
+    } catch (err) {
+      try { if (adWindow && !adWindow.closed) adWindow.close(); } catch {}
+      toast(err.message || "Could not start ad session");
+    } finally {
+      adBusy = false;
+      els.watch.disabled = !account;
+      els.watch.innerHTML = '<span class="button-icon">▶</span>Watch Ads';
+    }
+  }
+
+  function restorePendingAd() {
+    try {
+      const raw = storage.get("adtracker_pending_ad");
+      if (raw) pendingAd = JSON.parse(raw);
+    } catch { pendingAd = null; }
+  }
+
+  async function completeAdIfReady() {
+    if (!pendingAd || !account || adBusy) return;
+    const elapsed = Date.now() - Number(pendingAd.startedAt || 0);
+    if (elapsed < MIN_WATCH_MS) return;
+    adBusy = true;
+    els.watch.disabled = true;
+    try {
+      const result = await api("/api/account/me/increment-ad", {
+        method: "POST",
+        body: JSON.stringify({ adToken: pendingAd.adToken })
+      });
+      pendingAd = null;
+      storage.remove("adtracker_pending_ad");
+      setAccount(result.account);
+      const ads = Number(result.account.adsCount || 0);
+      if (ads % BREAK_EVERY === 0) {
+        breakUntil = Date.now() + BREAK_MS;
+        showResult(true, "Ad Count Updated", `Your ad has been counted. You reached ${ads} ads—take a 2-minute break.`);
+      } else {
+        showResult(true, "Ad Count Updated", "Your ad has been counted successfully.");
+      }
+    } catch (err) {
+      // Keep token only if minimum time has not elapsed; otherwise it may be consumed/expired.
+      pendingAd = null;
+      storage.remove("adtracker_pending_ad");
+      showResult(false, "Ad Not Counted", err.message || "Please open the ad again.");
+    } finally {
+      adBusy = false;
+      els.watch.disabled = !account;
+    }
+  }
+
+  function showResult(success, title, message) {
+    els.resultIcon.textContent = success ? "✓" : "!";
+    els.resultIcon.className = `modal-icon ${success ? "success" : "failure"}`;
+    els.resultTitle.textContent = title;
+    els.resultText.textContent = message;
+    showModal("resultModal");
+  }
+
+  async function openAdmin() {
+    hideModal("profileModal");
+    els.adminError.textContent = "";
+    showModal("adminLoginModal");
+    setTimeout(() => els.adminPassword.focus(), 100);
+  }
+
+  async function adminAuth() {
+    if (adminBusy) return;
+    const password = els.adminPassword.value;
+    if (!password) {
+      els.adminError.textContent = "Enter the admin password.";
+      return;
+    }
+    adminBusy = true;
+    els.adminLogin.disabled = true;
+    els.adminError.textContent = "";
+    try {
+      const data = await api("/api/admin/login", { method: "POST", body: JSON.stringify({ password }) });
+      adminToken = data.adminToken;
+      els.adminPassword.value = "";
+      hideModal("adminLoginModal");
+      showModal("adminModal");
+      await loadAdminUsers();
+    } catch (err) {
+      els.adminError.textContent = err.message || "Admin login failed";
+    } finally {
+      adminBusy = false;
+      els.adminLogin.disabled = false;
+    }
+  }
+
+  async function loadAdminUsers() {
+    els.adminSummary.textContent = "Loading users...";
+    els.adminList.replaceChildren();
+    try {
+      const data = await api("/api/admin/users");
+      const users = data.users || [];
+      const totalAds = users.reduce((sum, user) => sum + Number(user.adsCount || 0), 0);
+      els.adminSummary.textContent = `${users.length} active users · ${totalAds.toLocaleString()} total ads`;
+      if (!users.length) {
+        els.adminList.textContent = "No accounts yet.";
+        return;
+      }
+      users.forEach((user) => {
+        const row = document.createElement("div");
+        row.className = "user-row";
+        const info = document.createElement("div");
+        info.className = "user-info";
+        const name = document.createElement("div");
+        name.className = "user-name";
+        name.textContent = user.name;
+        const ads = document.createElement("div");
+        ads.className = "user-ads";
+        ads.textContent = `${Number(user.adsCount || 0).toLocaleString()} ads · Account #${user.id}`;
+        info.append(name, ads);
+        const reset = document.createElement("button");
+        reset.className = "reset";
+        reset.textContent = "Reset";
+        reset.addEventListener("click", async () => {
+          if (!confirm(`Reset ad count for ${user.name} to 0?`)) return;
+          reset.disabled = true;
+          try {
+            await api(`/api/admin/users/${encodeURIComponent(user.id)}/reset`, { method: "POST", body: "{}" });
+            toast(`${user.name}'s ad count reset`);
+            await loadAdminUsers();
+          } catch (err) {
+            toast(err.message || "Reset failed");
+            reset.disabled = false;
+          }
+        });
+        row.append(info, reset);
+        els.adminList.append(row);
+      });
+    } catch (err) {
+      els.adminSummary.textContent = err.message || "Could not load users.";
+    }
+  }
+
+  // Wire every control after the DOM is available (script is deferred).
+  els.accountAction.addEventListener("click", saveOrCheckAccount);
+  els.nameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") saveOrCheckAccount(); });
+  els.profileBtn.addEventListener("click", () => {
+    if (!account) return accountPopup("check");
+    els.profileInfo.textContent = `${account.name} · ${Number(account.adsCount || 0).toLocaleString()} ads watched`;
+    showModal("profileModal");
+  });
+  els.profileClose.addEventListener("click", () => hideModal("profileModal"));
+  els.adminOpen.addEventListener("click", openAdmin);
+  els.logoutBtn.addEventListener("click", async () => {
+    try { await api("/api/logout", { method: "POST", body: "{}" }); } catch {}
+    clearToken();
+    account = null;
+    pendingAd = null;
+    storage.remove("adtracker_pending_ad");
+    hideModal("profileModal");
+    els.status.textContent = "NOT CONNECTED";
+    els.accountName.textContent = "Not connected";
+    els.watch.disabled = true;
+    accountPopup("check");
+  });
+  els.adminLogin.addEventListener("click", adminAuth);
+  els.adminPassword.addEventListener("keydown", (e) => { if (e.key === "Enter") adminAuth(); });
+  els.adminLoginClose.addEventListener("click", () => hideModal("adminLoginModal"));
+  els.adminRefresh.addEventListener("click", loadAdminUsers);
+  els.adminClose.addEventListener("click", () => hideModal("adminModal"));
+  els.watch.addEventListener("click", beginAd);
+  els.resultClose.addEventListener("click", () => hideModal("resultModal"));
+
+  // Outside-click closes only the modal that was tapped, not nested actions.
+  ["accountModal", "profileModal", "adminLoginModal", "adminModal", "resultModal"].forEach(id => {
+    $(id).addEventListener("click", (event) => {
+      if (event.target === $(id) && id !== "accountModal") hideModal(id);
+    });
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) completeAdIfReady();
+  });
+  window.addEventListener("pageshow", completeAdIfReady);
+  window.addEventListener("focus", completeAdIfReady);
+  restorePendingAd();
+  loadSession();
+})();
+</script>
 </body>
 </html>
