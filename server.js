@@ -188,9 +188,12 @@ async function initDb() {
       ads_count BIGINT NOT NULL DEFAULT 0 CHECK (ads_count >= 0),
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_ad_attempt_at TIMESTAMPTZ
     );
   `);
+
+  await pool.query(`ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS last_ad_attempt_at TIMESTAMPTZ;`);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS job_accounts_created_idx
@@ -345,12 +348,49 @@ app.get("/api/account/me", requireAccount, (req, res) => {
   });
 });
 
-// Frontend calls this immediately before opening the ad in a new tab.
-app.post("/api/account/me/start-ad", requireAccount, (req, res) => {
+// Start a Monetag ad session. Server-side cooldown applies between attempts.
+app.post("/api/account/me/start-ad", requireAccount, async (req, res) => {
   const now = Date.now();
-  const token = crypto.randomBytes(32).toString("hex");
-  activeAdSessions.set(String(req.account.id), { token, startedAt: now, used: false });
-  res.json({ ok: true, adToken: token });
+  try {
+    const check = await pool.query(
+      `SELECT last_ad_attempt_at FROM job_accounts WHERE id = $1 AND is_active = TRUE`,
+      [req.account.id]
+    );
+    const last = check.rows[0]?.last_ad_attempt_at ? new Date(check.rows[0].last_ad_attempt_at).getTime() : 0;
+    const remaining = Math.max(0, MIN_AD_WATCH_MS - (now - last));
+    if (remaining > 0) {
+      return res.status(429).json({ ok: false, error: `Cooldown active. Wait ${Math.ceil(remaining / 1000)} seconds.` });
+    }
+    const token = crypto.randomBytes(32).toString("hex");
+    await pool.query(
+      `UPDATE job_accounts SET last_ad_attempt_at = NOW(), updated_at = NOW() WHERE id = $1`,
+      [req.account.id]
+    );
+    activeAdSessions.set(String(req.account.id), { token, startedAt: now, used: false });
+    res.json({ ok: true, adToken: token });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Could not start ad session." });
+  }
+});
+
+// A failed/early-close ad consumes the token and resets cooldown from this moment.
+app.post("/api/account/me/cancel-ad", requireAccount, async (req, res) => {
+  const key = String(req.account.id);
+  const session = activeAdSessions.get(key);
+  const suppliedToken = String(req.body?.adToken || "");
+  if (!session || !suppliedToken || suppliedToken !== session.token || session.used) {
+    return res.status(400).json({ ok: false, error: "Ad session is invalid." });
+  }
+  session.used = true;
+  activeAdSessions.delete(key);
+  try {
+    await pool.query(`UPDATE job_accounts SET last_ad_attempt_at = NOW(), updated_at = NOW() WHERE id = $1`, [req.account.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Could not close ad session." });
+  }
 });
 
 // Count only a matching, unused server-issued token after at least 8 seconds.
@@ -378,7 +418,7 @@ app.post("/api/account/me/increment-ad", requireAccount, async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE job_accounts
-       SET ads_count = ads_count + 1, updated_at = NOW()
+       SET ads_count = ads_count + 1, last_ad_attempt_at = NOW(), updated_at = NOW()
        WHERE id = $1 AND is_active = TRUE
        RETURNING id, name, ads_count`,
       [req.account.id]
