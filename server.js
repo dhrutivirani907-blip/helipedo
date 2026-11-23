@@ -40,7 +40,7 @@ const corsOptions = {
     if (!origin || ALLOWED_ORIGINS.has(origin)) return callback(null, true);
     return callback(new Error("Origin is not allowed by CORS"));
   },
-  credentials: true,
+  credentials: false,
   methods: ["GET", "POST", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "X-Account-Token", "X-Admin-Token"],
   optionsSuccessStatus: 204
