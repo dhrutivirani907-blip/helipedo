@@ -24,7 +24,7 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
   </div>
 </header>
 <h1>Your ad activity</h1>
-<p class="sub">Open the ad link and return after at least 8 seconds to record progress. An 8-second cooldown applies after each attempt.</p>
+<p class="sub">Open the ad link and return after at least 12 seconds to record progress. A 5-second cooldown applies after each attempt.</p>
 <section class="counter-card">
   <div class="count-label">TOTAL ADS WATCHED</div>
   <div class="count" id="count">0</div>
@@ -119,8 +119,8 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
   // Update this URL only if your deployed backend changes.
   const API = "https://helipedo.onrender.com";
   const AD_URL = "https://asiafilm.org/4/17d6a856c8a2251142b070b3c3d63131";
-   const COOLDOWN_MS = 8000;
-  const MIN_WATCH_MS = 8000;
+   const COOLDOWN_MS = 5000;
+  const MIN_WATCH_MS = 12000;
   const BREAK_EVERY = 30;
   const BREAK_MS = 120000;
 
@@ -389,7 +389,7 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
       adBusy = false;
       els.watch.disabled = true;
       els.watch.innerHTML = '<span class="button-icon">⌛</span>Return to App';
-      toast('Return to this app after at least 8 seconds.');
+      toast('Return to this app after at least 12 seconds.');
     } catch (err) {
       try { if (adWindow && !adWindow.closed) adWindow.close(); } catch {}
       adWindow = null;
@@ -414,7 +414,7 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
         await cancelAdSession(adToken);
         pendingAd = null;
         storage.remove('adtracker_pending_ad');
-        showResult(false, 'Count Not Updated', 'You returned before 8 seconds. Your count was not updated.');
+        showResult(false, 'Count Not Updated', 'You returned before 12 seconds. Your count was not updated.');
         setCooldown(COOLDOWN_MS);
         return;
       }
