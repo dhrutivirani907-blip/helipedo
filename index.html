@@ -31,10 +31,10 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
   <div class="count" id="count">0</div>
   <div class="count-caption">Ads completed on your backend account</div>
   <div class="progress-wrap">
-    <div class="progress-head"><span id="progressLabel">Progress to break</span><span id="progressNum">0 / 100</span></div>
+    <div class="progress-head"><span id="progressLabel">Progress to break</span><span id="progressNum">0 / 10</span></div>
     <div class="progress"><div class="bar" id="bar"></div></div>
   </div>
-  <div class="break-note"><span>◇</span><span>2-minute break after every 100 ads</span></div>
+  <div class="break-note"><span>◇</span><span>2-minute break after every 10 ads</span></div>
 </section>
 <button class="action" id="watch"><span class="button-icon">▶</span>Watch Ads</button>
 <div class="secondary"><span>BACKEND ACCOUNT</span><span id="accountName">Not connected</span></div>
@@ -122,7 +122,7 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
   const AD_FUNCTION = "show_12333273";
    const COOLDOWN_MS = 8000;
   const MIN_WATCH_MS = 8000;
-  const BREAK_EVERY = 100;
+  const BREAK_EVERY = 10;
   const BREAK_MS = 120000;
 
   const $ = (id) => document.getElementById(id);
