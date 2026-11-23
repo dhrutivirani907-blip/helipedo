@@ -82,7 +82,8 @@ const adminLimiter = rateLimit({
 app.use("/api/", generalLimiter);
 
 const COOKIE_NAME = "job_account_session";
-const MIN_AD_WATCH_MS = 8000;
+const MIN_AD_WATCH_MS = 12000;
+const AD_COOLDOWN_MS = 5000;
 const MAX_AD_SESSION_MS = 60 * 60 * 1000;
 // One active, one-use ad session per account. Tokens expire after one hour.
 const activeAdSessions = new Map();
@@ -357,7 +358,7 @@ app.post("/api/account/me/start-ad", requireAccount, async (req, res) => {
       [req.account.id]
     );
     const last = check.rows[0]?.last_ad_attempt_at ? new Date(check.rows[0].last_ad_attempt_at).getTime() : 0;
-    const remaining = Math.max(0, MIN_AD_WATCH_MS - (now - last));
+    const remaining = Math.max(0, AD_COOLDOWN_MS - (now - last));
     if (remaining > 0) {
       return res.status(429).json({ ok: false, error: `Cooldown active. Wait ${Math.ceil(remaining / 1000)} seconds.` });
     }
@@ -393,7 +394,7 @@ app.post("/api/account/me/cancel-ad", requireAccount, async (req, res) => {
   }
 });
 
-// Count only a matching, unused server-issued token after at least 8 seconds.
+// Count only a matching, unused server-issued token after at least 12 seconds.
 // The token is consumed synchronously before the database call, blocking duplicate events.
 app.post("/api/account/me/increment-ad", requireAccount, async (req, res) => {
   const key = String(req.account.id);
@@ -404,7 +405,7 @@ app.post("/api/account/me/increment-ad", requireAccount, async (req, res) => {
     return res.status(400).json({ ok: false, error: "Ad session is invalid or already used. Please open the ad again." });
   }
   if (Date.now() - session.startedAt < MIN_AD_WATCH_MS) {
-    return res.status(400).json({ ok: false, error: "Minimum ad watch time is 8 seconds." });
+    return res.status(400).json({ ok: false, error: "Minimum ad watch time is 12 seconds." });
   }
   if (Date.now() - session.startedAt > MAX_AD_SESSION_MS) {
     activeAdSessions.delete(key);
