@@ -208,7 +208,8 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
     renderCount(Number(data?.adsCount || 0));
     els.status.textContent = "CONNECTED";
     els.status.style.color = "var(--green)";
-    els.watch.disabled = false;
+    els.watch.disabled = Boolean(pendingAd) || adBusy || Date.now() < cooldownUntil || Date.now() < breakUntil;
+    if (pendingAd) els.watch.innerHTML = '<span class="button-icon">⌛</span>Return to App';
   }
 
   function renderCount(count) {
@@ -315,17 +316,26 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
   function setCooldown(ms) {
     cooldownUntil = Date.now() + Math.max(0, ms);
     if (cooldownTicker) clearInterval(cooldownTicker);
-    cooldownTicker = setInterval(() => {
-      const remaining = Math.max(0, cooldownUntil - Date.now());
-      if (remaining <= 0) {
-        clearInterval(cooldownTicker);
-        cooldownTicker = null;
-        els.watch.disabled = !account || adBusy || Date.now() < breakUntil;
-        els.watch.innerHTML = '<span class="button-icon">▶</span>Watch Ads';
-      } else {
+    const updateCooldownButton = () => {
+      const now = Date.now();
+      const cooldownRemaining = Math.max(0, cooldownUntil - now);
+      const breakRemaining = Math.max(0, breakUntil - now);
+      if (cooldownRemaining > 0) {
         els.watch.disabled = true;
-        els.watch.innerHTML = `<span class="button-icon">⌛</span>Wait ${Math.ceil(remaining / 1000)}s`;
+        els.watch.innerHTML = `<span class="button-icon">⌛</span>Cooldown ${Math.ceil(cooldownRemaining / 1000)}s`;
+      } else if (breakRemaining > 0) {
+        els.watch.disabled = true;
+        els.watch.innerHTML = `<span class="button-icon">⌛</span>Break ${Math.ceil(breakRemaining / 1000)}s`;
+      } else {
+        if (cooldownTicker) clearInterval(cooldownTicker);
+        cooldownTicker = null;
+        els.watch.disabled = !account || adBusy || Boolean(pendingAd);
+        els.watch.innerHTML = '<span class="button-icon">▶</span>Watch Ads';
       }
+    };
+    updateCooldownButton();
+    cooldownTicker = setInterval(() => {
+      updateCooldownButton();
     }, 250);
   }
 
@@ -340,6 +350,10 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
   }
 
   async function beginAd() {
+    if (pendingAd) {
+      toast('Please return to the app to finish your previous ad attempt.');
+      return;
+    }
     if (!account || adBusy) {
       if (!account) accountPopup('check');
       return;
@@ -372,8 +386,10 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
         storage.set('adtracker_pending_ad', JSON.stringify(pendingAd));
         window.location.href = AD_URL;
       }
-      els.watch.innerHTML = '<span class="button-icon">▶</span>Ad Opened...';
-      toast('Return after at least 8 seconds. Early return will not count.');
+      adBusy = false;
+      els.watch.disabled = true;
+      els.watch.innerHTML = '<span class="button-icon">⌛</span>Return to App';
+      toast('Return to this app after at least 8 seconds.');
     } catch (err) {
       try { if (adWindow && !adWindow.closed) adWindow.close(); } catch {}
       adWindow = null;
@@ -426,7 +442,7 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
     } finally {
       adBusy = false;
       if (!cooldownTicker) {
-        els.watch.disabled = !account || Date.now() < breakUntil;
+        els.watch.disabled = !account || adBusy || Boolean(pendingAd) || Date.now() < breakUntil;
         els.watch.innerHTML = '<span class="button-icon">▶</span>Watch Ads';
       }
     }
@@ -565,6 +581,17 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
     $(id).addEventListener("click", (event) => {
       if (event.target === $(id) && id !== "accountModal") hideModal(id);
     });
+  });
+
+  // Detect return from the external ad link across tab focus, app visibility, and page restore.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && pendingAd) finishDirectAdOnReturn();
+  });
+  window.addEventListener('focus', () => {
+    if (pendingAd) finishDirectAdOnReturn();
+  });
+  window.addEventListener('pageshow', () => {
+    if (pendingAd) finishDirectAdOnReturn();
   });
 
   restorePendingAd();
