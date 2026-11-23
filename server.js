@@ -26,11 +26,29 @@ const pool = new Pool({
 
 app.set("trust proxy", 1);
 app.use(helmet({ crossOriginResourcePolicy: false }));
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
+const ALLOWED_ORIGINS = new Set([
+  "https://dhrutivirani907-blip.github.io",
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5173"
+]);
+
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow requests without an Origin header (server-to-server / health checks).
+    if (!origin || ALLOWED_ORIGINS.has(origin)) return callback(null, true);
+    return callback(new Error("Origin is not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "X-Account-Token", "X-Admin-Token"],
+  optionsSuccessStatus: 204
+};
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 app.use(express.json({ limit: "20kb" }));
+app.use((req, res, next) => { if (req.method === "OPTIONS") return res.sendStatus(204); next(); });
 
 // Parse cookies used by the account session (no extra package required).
 app.use((req, res, next) => {
@@ -253,7 +271,7 @@ app.post("/api/account", async (req, res) => {
 
     const account = created.rows[0];
     const sessionToken = makeToken(account.id);
-    res.cookie(COOKIE_NAME, sessionToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", maxAge: 180 * 24 * 60 * 60 * 1000, path: "/" });
+    setSessionCookie(res, account.id);
 
     res.status(201).json({
       ok: true,
@@ -299,7 +317,7 @@ app.post("/api/account/check", async (req, res) => {
 
     const account = result.rows[0];
     const sessionToken = makeToken(account.id);
-    res.cookie(COOKIE_NAME, sessionToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", maxAge: 180 * 24 * 60 * 60 * 1000, path: "/" });
+    setSessionCookie(res, account.id);
 
     res.json({
       ok: true,
