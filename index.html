@@ -323,7 +323,7 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
     try { adWindow = window.open("about:blank", "_blank"); } catch {}
     try {
       const start = await api("/api/account/me/start-ad", { method: "POST", body: "{}" });
-      pendingAd = { adToken: start.adToken, startedAt: Date.now() };
+      pendingAd = { adToken: start.adToken, startedAt: Date.now(), awayAt: Date.now() };
       storage.set("adtracker_pending_ad", JSON.stringify(pendingAd));
       if (adWindow && !adWindow.closed) {
         adWindow.location.href = AD_URL;
@@ -332,9 +332,6 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
         window.location.href = AD_URL;
       }
       toast("Return to this app after at least 8 seconds");
-      setTimeout(() => {
-        if (!document.hidden) completeAdIfReady();
-      }, MIN_WATCH_MS + 100);
     } catch (err) {
       try { if (adWindow && !adWindow.closed) adWindow.close(); } catch {}
       toast(err.message || "Could not start ad session");
@@ -354,8 +351,16 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
 
   async function completeAdIfReady() {
     if (!pendingAd || !account || adBusy) return;
-    const elapsed = Date.now() - Number(pendingAd.startedAt || 0);
-    if (elapsed < MIN_WATCH_MS) return;
+    // Only measure the time away from this app, not time spent waiting on the app itself.
+    const awayAt = Number(pendingAd.awayAt || 0);
+    const elapsedAway = awayAt ? Date.now() - awayAt : 0;
+    if (elapsedAway < MIN_WATCH_MS) {
+      pendingAd = null;
+      storage.remove("adtracker_pending_ad");
+      showResult(false, "Count Not Updated", "Watch Ads minimum 8 seconds. You returned too early, so your ad count was not updated.");
+      els.watch.disabled = !account;
+      return;
+    }
     adBusy = true;
     els.watch.disabled = true;
     try {
@@ -374,7 +379,6 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
         showResult(true, "Ad Count Updated", "Your ad has been counted successfully.");
       }
     } catch (err) {
-      // Keep token only if minimum time has not elapsed; otherwise it may be consumed/expired.
       pendingAd = null;
       storage.remove("adtracker_pending_ad");
       showResult(false, "Ad Not Counted", err.message || "Please open the ad again.");
@@ -509,10 +513,10 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) completeAdIfReady();
+    if (!document.hidden && pendingAd) completeAdIfReady();
   });
-  window.addEventListener("pageshow", completeAdIfReady);
-  window.addEventListener("focus", completeAdIfReady);
+  window.addEventListener("pageshow", () => { if (pendingAd) completeAdIfReady(); });
+  window.addEventListener("focus", () => { if (pendingAd) completeAdIfReady(); });
   restorePendingAd();
   loadSession();
 })();
