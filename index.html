@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#080b12">
 <title>Ad Tracker</title>
-<script src="https://libtl.com/sdk.js" data-zone="12333273" data-sdk="show_12333273"></script>
 <style>
 :root{--bg:#080b12;--panel:#111722;--panel2:#151e2b;--line:rgba(255,255,255,.08);--muted:#8c9aad;--white:#f6f8fc;--green:#54e3a2;--green2:#16b978;--red:#ff6f7d}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#182535 0,transparent 48%),var(--bg);color:var(--white);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:22px}
@@ -25,16 +24,16 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
   </div>
 </header>
 <h1>Your ad activity</h1>
-<p class="sub">Watch a Monetag ad for at least 8 seconds to record your progress. An 8-second cooldown applies after each attempt.</p>
+<p class="sub">Open the ad link and return after at least 8 seconds to record progress. An 8-second cooldown applies after each attempt.</p>
 <section class="counter-card">
   <div class="count-label">TOTAL ADS WATCHED</div>
   <div class="count" id="count">0</div>
   <div class="count-caption">Ads completed on your backend account</div>
   <div class="progress-wrap">
-    <div class="progress-head"><span id="progressLabel">Progress to break</span><span id="progressNum">0 / 10</span></div>
+    <div class="progress-head"><span id="progressLabel">Progress to break</span><span id="progressNum">0 / 30</span></div>
     <div class="progress"><div class="bar" id="bar"></div></div>
   </div>
-  <div class="break-note"><span>◇</span><span>2-minute break after every 10 ads</span></div>
+  <div class="break-note"><span>◇</span><span>2-minute break after every 30 ads</span></div>
 </section>
 <button class="action" id="watch"><span class="button-icon">▶</span>Watch Ads</button>
 <div class="secondary"><span>BACKEND ACCOUNT</span><span id="accountName">Not connected</span></div>
@@ -119,10 +118,10 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
 
   // Update this URL only if your deployed backend changes.
   const API = "https://helipedo.onrender.com";
-  const AD_FUNCTION = "show_12333273";
+  const AD_URL = "https://uplcm.com/4/11914105";
    const COOLDOWN_MS = 8000;
   const MIN_WATCH_MS = 8000;
-  const BREAK_EVERY = 10;
+  const BREAK_EVERY = 30;
   const BREAK_MS = 120000;
 
   const $ = (id) => document.getElementById(id);
@@ -149,6 +148,7 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
   let account = null;
   let adminToken = "";
   let pendingAd = null;
+  let adWindow = null;
   let accountBusy = false;
   let adminBusy = false;
   let adBusy = false;
@@ -284,12 +284,14 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
       if (token()) {
         const data = await api("/api/account/me");
         setAccount(data.account);
+        if (pendingAd) finishDirectAdOnReturn();
         return;
       }
       const sess = await api("/api/session");
       if (sess.hasSession) {
         const me = await api("/api/account/me");
         setAccount(me.account);
+        if (pendingAd) finishDirectAdOnReturn();
       } else {
         els.status.textContent = "NOT CONNECTED";
         els.accountName.textContent = "Not connected";
@@ -350,39 +352,59 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
       toast(`Please wait ${Math.ceil((cooldownUntil - Date.now()) / 1000)} seconds`);
       return;
     }
-    if (typeof window[AD_FUNCTION] !== 'function') {
-      toast('Monetag is still loading. Please try again.');
-      return;
-    }
 
     adBusy = true;
     els.watch.disabled = true;
-    els.watch.innerHTML = '<span class="button-icon">⌛</span>Preparing Ad...';
+    els.watch.innerHTML = '<span class="button-icon">⌛</span>Opening Ad...';
+    // Open a blank tab directly from the click so popup blockers are less likely to block it.
+    try { adWindow = window.open('about:blank', '_blank'); } catch { adWindow = null; }
     let adToken = '';
-    let adStartedAt = 0;
     try {
       const start = await api('/api/account/me/start-ad', { method: 'POST', body: '{}' });
       adToken = start.adToken;
-      adStartedAt = Date.now();
-      pendingAd = { adToken, startedAt: adStartedAt };
+      pendingAd = { adToken, startedAt: Date.now(), leftApp: true };
       storage.set('adtracker_pending_ad', JSON.stringify(pendingAd));
-      els.watch.innerHTML = '<span class="button-icon">▶</span>Ad Running...';
+      if (adWindow && !adWindow.closed) {
+        adWindow.location.href = AD_URL;
+      } else {
+        // If a popup is blocked, navigate this page to the direct link.
+        pendingAd.leftApp = true;
+        storage.set('adtracker_pending_ad', JSON.stringify(pendingAd));
+        window.location.href = AD_URL;
+      }
+      els.watch.innerHTML = '<span class="button-icon">▶</span>Ad Opened...';
+      toast('Return after at least 8 seconds. Early return will not count.');
+    } catch (err) {
+      try { if (adWindow && !adWindow.closed) adWindow.close(); } catch {}
+      adWindow = null;
+      if (adToken) await cancelAdSession(adToken);
+      pendingAd = null;
+      storage.remove('adtracker_pending_ad');
+      toast(err.message || 'Could not open ad link');
+      adBusy = false;
+      els.watch.disabled = !account;
+      els.watch.innerHTML = '<span class="button-icon">▶</span>Watch Ads';
+    }
+  }
 
-      // Monetag rewarded-interstitial SDK promise resolves after the ad closes.
-      const event = await window[AD_FUNCTION]({ type: 'end', requestVar: 'watch_button' });
-      const elapsed = Date.now() - adStartedAt;
+  async function finishDirectAdOnReturn() {
+    if (!pendingAd || !account || !pendingAd.leftApp || adBusy) return;
+    const elapsed = Date.now() - Number(pendingAd.startedAt || 0);
+    const adToken = pendingAd.adToken;
+    adBusy = true;
+    els.watch.disabled = true;
+    try {
       if (elapsed < MIN_WATCH_MS) {
         await cancelAdSession(adToken);
         pendingAd = null;
         storage.remove('adtracker_pending_ad');
-        showResult(false, 'Count Not Updated', 'The ad was closed before 8 seconds. Your count was not updated.');
+        showResult(false, 'Count Not Updated', 'You returned before 8 seconds. Your count was not updated.');
         setCooldown(COOLDOWN_MS);
         return;
       }
-      // SDK completion is required, and the backend independently checks the token and timer.
       const result = await api('/api/account/me/increment-ad', {
         method: 'POST',
-        body: JSON.stringify({ adToken, monetagEvent: event?.event_type || 'confirmed' })
+        body: JSON.stringify({ adToken })
       });
       pendingAd = null;
       storage.remove('adtracker_pending_ad');
@@ -390,16 +412,16 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
       const ads = Number(result.account.adsCount || 0);
       if (ads % BREAK_EVERY === 0) {
         breakUntil = Date.now() + BREAK_MS;
-        showResult(true, 'Ad Count Updated', `Your ad has been counted. You reached ${ads} ads—take a 2-minute break.`);
+        showResult(true, 'Ad Count Updated', `Your count reached ${ads} ads. Take a 2-minute break.`);
       } else {
-        showResult(true, 'Ad Count Updated', 'Monetag ad completed and your count was updated.');
+        showResult(true, 'Ad Count Updated', 'Your ad visit was counted successfully.');
       }
       setCooldown(COOLDOWN_MS);
     } catch (err) {
-      if (adToken) await cancelAdSession(adToken);
+      await cancelAdSession(adToken);
       pendingAd = null;
       storage.remove('adtracker_pending_ad');
-      showResult(false, 'Ad Not Counted', err.message || 'The ad did not complete or could not be verified. Please try again.');
+      showResult(false, 'Ad Not Counted', err.message || 'Ad visit could not be verified. Please try again.');
       setCooldown(COOLDOWN_MS);
     } finally {
       adBusy = false;
@@ -411,16 +433,14 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
   }
 
   function restorePendingAd() {
-    // A pending ad from a previous page/app session is never rewarded automatically.
+    // Keep the server-issued token to finish after returning from a same-tab ad link.
     try {
       const raw = storage.get('adtracker_pending_ad');
       if (raw) {
         const saved = JSON.parse(raw);
-        if (saved?.adToken) cancelAdSession(saved.adToken);
+        if (saved?.adToken && Number(saved.startedAt) > 0) pendingAd = saved;
       }
-    } catch {}
-    pendingAd = null;
-    storage.remove('adtracker_pending_ad');
+    } catch { pendingAd = null; }
   }
 
   function showResult(success, title, message) {
