@@ -252,10 +252,12 @@ app.post("/api/account", async (req, res) => {
     );
 
     const account = created.rows[0];
-    setSessionCookie(res, account.id);
+    const sessionToken = makeToken(account.id);
+    res.cookie(COOKIE_NAME, sessionToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", maxAge: 180 * 24 * 60 * 60 * 1000, path: "/" });
 
     res.status(201).json({
       ok: true,
+      sessionToken,
       account: {
         id: account.id,
         name: account.name,
@@ -296,10 +298,12 @@ app.post("/api/account/check", async (req, res) => {
     }
 
     const account = result.rows[0];
-    setSessionCookie(res, account.id);
+    const sessionToken = makeToken(account.id);
+    res.cookie(COOKIE_NAME, sessionToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", maxAge: 180 * 24 * 60 * 60 * 1000, path: "/" });
 
     res.json({
       ok: true,
+      sessionToken,
       account: {
         id: account.id,
         name: account.name,
