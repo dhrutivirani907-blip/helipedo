@@ -182,7 +182,7 @@ button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:
     if (token()) headers["X-Account-Token"] = token();
     if (adminToken) headers["X-Admin-Token"] = adminToken;
     const response = await fetch(API + path, {
-      ...options, headers, credentials: "include"
+      ...options, headers, credentials: "omit"
     });
     let data;
     try { data = await response.json(); }
