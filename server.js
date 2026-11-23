@@ -1,305 +1,427 @@
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const { Pool } = require("pg");
+const crypto = require("crypto");
 
-  const API_BASE = "https://helipedo.onrender.com";
-  const AD_URL = "https://asiafilm.org/4/17d6a856c8a2251142b070b3c3d63131";
-  const MIN_SECONDS = 8, BREAK_SECONDS = 120, EVERY_ADS = 100;
+const app = express();
+const PORT = process.env.PORT || 10000;
 
-  const countEl = document.getElementById("count");
-  const watchBtn = document.getElementById("watch");
-  const bar = document.getElementById("bar");
-  const progressNum = document.getElementById("progressNum");
-  const progressLabel = document.getElementById("progressLabel");
-  const statusEl = document.getElementById("status");
-  const accountNameEl = document.getElementById("accountName");
+const DATABASE_URL = process.env.DATABASE_URL;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const SESSION_SECRET = process.env.SESSION_SECRET;
 
-  const accountModal = document.getElementById("accountModal");
-  const checkingModal = document.getElementById("checkingModal");
-  const profileModal = document.getElementById("profileModal");
-  const adminLoginModal = document.getElementById("adminLoginModal");
-  const adminModal = document.getElementById("adminModal");
+if (!DATABASE_URL) throw new Error("DATABASE_URL environment variable is required");
+if (!ADMIN_PASSWORD) throw new Error("ADMIN_PASSWORD environment variable is required");
+if (!SESSION_SECRET) throw new Error("SESSION_SECRET environment variable is required");
 
-  let account = null;
-  let pending = null;
-  let breakUntil = 0;
-  let tickTimer = null;
-  let toastTimer = null;
-  let adminToken = null;
-  let leftPageForAd = false;
-  let checkingReturn = false;
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000
+});
 
-  function show(el){el.classList.add("show")}
-  function hide(el){el.classList.remove("show")}
-  function toast(msg){
-    const el=document.getElementById("toast");
-    el.textContent=msg;el.classList.add("show");
-    clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("show"),2500);
+app.set("trust proxy", 1);
+app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
+app.use(express.json({ limit: "20kb" }));
+
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const adminLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+app.use("/api/", generalLimiter);
+
+const COOKIE_NAME = "job_account_session";
+
+function normalizeName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function validName(name) {
+  return name.length >= 2 && name.length <= 40 && /^[\p{L}\p{N} ._-]+$/u.test(name);
+}
+
+function sign(value) {
+  return crypto.createHmac("sha256", SESSION_SECRET).update(value).digest("hex");
+}
+
+function makeToken(accountId) {
+  const payload = `${accountId}.${Date.now()}`;
+  return `${payload}.${sign(payload)}`;
+}
+
+function verifyToken(token) {
+  try {
+    if (!token) return null;
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const [accountId, issuedAt, signature] = parts;
+    if (!/^\d+$/.test(accountId) || !/^\d+$/.test(issuedAt)) return null;
+
+    // Session lifetime: 180 days.
+    if (Date.now() - Number(issuedAt) > 180 * 24 * 60 * 60 * 1000) return null;
+
+    const expected = sign(`${accountId}.${issuedAt}`);
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+
+    return Number(accountId);
+  } catch {
+    return null;
   }
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
-  }
-  async function api(path, options={}){
-    const opts={...options,credentials:"include",headers:{"Content-Type":"application/json",...(options.headers||{})}};
-    const response=await fetch(API_BASE+path,opts);
-    let data=null;
-    try{data=await response.json()}catch{}
-    if(!response.ok) throw new Error(data?.error || "Server request failed.");
-    return data;
-  }
+}
 
-  function secondsLeft(){return Math.max(0,Math.ceil((breakUntil-Date.now())/1000))}
-  function formatTime(sec){const m=Math.floor(sec/60),s=sec%60;return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`}
+function setSessionCookie(res, accountId) {
+  res.cookie(COOKIE_NAME, makeToken(accountId), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    maxAge: 180 * 24 * 60 * 60 * 1000,
+    path: "/"
+  });
+}
 
-  function render(){
-    const count=Number(account?.adsCount||0);
-    countEl.textContent=count.toLocaleString();
-    const progress=count%EVERY_ADS;
-    bar.style.width=progress+"%";
-    progressNum.textContent=`${progress} / ${EVERY_ADS}`;
-    accountNameEl.textContent=account?.name||"Not connected";
-    const left=secondsLeft();
-    if(left>0){
-      watchBtn.disabled=true;
-      watchBtn.innerHTML=`<span class="button-icon">🔒</span>Break · ${formatTime(left)}`;
-      progressLabel.textContent="Break timer";
-    }else{
-      watchBtn.disabled=!account || !!pending;
-      watchBtn.innerHTML=pending
-        ? '<span class="button-icon">↗</span>Ad opened…'
-        : '<span class="button-icon">▶</span>Watch Ads';
-      progressLabel.textContent="Progress to break";
+function clearSessionCookie(res) {
+  res.clearCookie(COOKIE_NAME, { path: "/" });
+}
+
+function getAccountId(req) {
+  return verifyToken(req.headers["x-account-token"]) ||
+    verifyToken(req.cookies?.[COOKIE_NAME]);
+}
+
+async function requireAccount(req, res, next) {
+  const accountId = getAccountId(req);
+  if (!accountId) return res.status(401).json({ ok: false, error: "Account session expired. Please enter your name again." });
+
+  try {
+    const result = await pool.query(
+      "SELECT id, name, ads_count FROM job_accounts WHERE id = $1 AND is_active = TRUE",
+      [accountId]
+    );
+    if (!result.rows[0]) {
+      clearSessionCookie(res);
+      return res.status(401).json({ ok: false, error: "Account not found." });
     }
-    document.getElementById("profileInfo").textContent=account
-      ? `Name: ${account.name}\nTotal ads: ${Number(account.adsCount).toLocaleString()}`
-      : "No account connected.";
+    req.account = result.rows[0];
+    next();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Server error." });
   }
+}
 
-  async function refreshAccount(){
-    try{
-      const data=await api("/api/account/me");
-      account=data.account;
-      statusEl.textContent="SECURE • ONLINE";
-      render();
-      return true;
-    }catch{
-      account=null;
-      statusEl.textContent="ACCOUNT REQUIRED";
-      render();
-      return false;
+function requireAdmin(req, res, next) {
+  const token = String(req.headers["x-admin-token"] || "");
+  if (!token || token.length < 20) return res.status(401).json({ ok: false, error: "Admin authentication required." });
+
+  const expected = sign("admin:" + ADMIN_PASSWORD);
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected))) {
+      return res.status(401).json({ ok: false, error: "Invalid admin session." });
     }
+  } catch {
+    return res.status(401).json({ ok: false, error: "Invalid admin session." });
   }
+  next();
+}
 
-  async function boot(){
-    try{
-      const session=await api("/api/session");
-      if(session.hasSession){
-        // Requirement: popup appears every time. Returning users get Check.
-        document.getElementById("accountTitle").textContent="Enter Your Name";
-        document.getElementById("accountText").textContent="Enter the same name used for your backend job account.";
-        document.getElementById("accountAction").textContent="Check";
-        document.getElementById("accountError").textContent="";
-        show(accountModal);
-      }else{
-        document.getElementById("accountTitle").textContent="Enter Your Name";
-        document.getElementById("accountText").textContent="Create your job account. Your ad count will be stored securely on the server.";
-        document.getElementById("accountAction").textContent="Save";
-        document.getElementById("accountError").textContent="";
-        show(accountModal);
-      }
-      statusEl.textContent="READY";
-    }catch{
-      statusEl.textContent="SERVER ERROR";
-      toast("Could not connect to backend.");
-      show(accountModal);
+async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS job_accounts (
+      id BIGSERIAL PRIMARY KEY,
+      name VARCHAR(40) NOT NULL,
+      name_key VARCHAR(40) NOT NULL UNIQUE,
+      ads_count BIGINT NOT NULL DEFAULT 0 CHECK (ads_count >= 0),
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS job_accounts_created_idx
+    ON job_accounts(created_at DESC);
+  `);
+}
+
+app.get("/", (req, res) => {
+  res.json({
+    status: "Active",
+    app: "Ad Tracker Backend",
+    database: "Connected API",
+    version: "2.0.0"
+  });
+});
+
+app.get("/api/health", async (req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ ok: true, status: "healthy" });
+  } catch {
+    res.status(503).json({ ok: false, status: "database_unavailable" });
+  }
+});
+
+// Tells the frontend whether this browser already has a backend session.
+// No user data is stored in localStorage.
+app.get("/api/session", async (req, res) => {
+  const accountId = getAccountId(req);
+  if (!accountId) return res.json({ ok: true, hasSession: false });
+
+  try {
+    const result = await pool.query(
+      "SELECT id, name, ads_count FROM job_accounts WHERE id = $1 AND is_active = TRUE",
+      [accountId]
+    );
+    if (!result.rows[0]) {
+      clearSessionCookie(res);
+      return res.json({ ok: true, hasSession: false });
     }
-    render();
+    res.json({ ok: true, hasSession: true });
+  } catch {
+    res.status(500).json({ ok: false, error: "Server error." });
+  }
+});
+
+// First-time account creation.
+app.post("/api/account", async (req, res) => {
+  const name = normalizeName(req.body?.name);
+  if (!validName(name)) {
+    return res.status(400).json({
+      ok: false,
+      error: "Please enter a valid name (2-40 characters)."
+    });
   }
 
-  async function saveOrCheck(){
-    const input=document.getElementById("nameInput");
-    const error=document.getElementById("accountError");
-    const name=input.value.trim();
-    if(name.length<2){error.textContent="Please enter your name.";return}
-    const action=document.getElementById("accountAction");
-    action.disabled=true; error.textContent="";
-    hide(accountModal); show(checkingModal);
+  const nameKey = name.toLocaleLowerCase("en-US");
 
-    try{
-      // Determine mode from whether a backend session exists.
-      const session=await api("/api/session");
-      const endpoint=session.hasSession ? "/api/account/check" : "/api/account";
-      const data=await api(endpoint,{method:"POST",body:JSON.stringify({name})});
-      account=data.account;
-      breakUntil=0;
-      hide(checkingModal);
-      statusEl.textContent="SECURE • ONLINE";
-      render();
-      toast(session.hasSession ? "Account verified." : "Account created successfully.");
-    }catch(err){
-      hide(checkingModal);
-      error.textContent=err.message;
-      show(accountModal);
-    }finally{
-      action.disabled=false;
-    }
-  }
+  try {
+    const existing = await pool.query(
+      "SELECT id FROM job_accounts WHERE name_key = $1",
+      [nameKey]
+    );
 
-  function openAd(){
-    if(!account || pending || secondsLeft()>0)return;
-    const started=Date.now();
-    pending={started};
-    const opened=window.open(AD_URL,"_blank");
-    if(!opened){
-      pending=null;render();
-      toast("Please allow pop-ups, then tap Watch Ads again.");
-      return;
-    }
-    render();
-  }
-
-  function showAdResult(success, message){
-    const icon=document.getElementById("resultIcon");
-    icon.className="modal-icon "+(success?"success":"failure");
-    icon.textContent=success?"✓":"!";
-    document.getElementById("resultTitle").textContent=success?"Ad Count Updated":"Count Not Updated";
-    document.getElementById("resultText").textContent=message;
-    show(document.getElementById("resultModal"));
-  }
-
-  async function checkReturn(){
-    if(!pending || checkingReturn || document.visibilityState==="hidden")return;
-    checkingReturn=true;
-    const elapsed=(Date.now()-pending.started)/1000;
-    pending=null;
-    leftPageForAd=false;
-
-    if(elapsed<MIN_SECONDS){
-      checkingReturn=false;
-      render();
-      showAdResult(false,"Watch ads for a minimum of 8 seconds. Your ad count has not been updated.");
-      return;
-    }
-
-    try{
-      const data=await api("/api/account/me/increment-ad",{method:"POST",body:"{}"});
-      account=data.account;
-      if(account.adsCount % EVERY_ADS===0){
-        breakUntil=Date.now()+BREAK_SECONDS*1000;
-        render();
-        showAdResult(true,"1 ad counted successfully. You completed 100 ads, so your 2-minute break has started.");
-      }else{
-        render();
-        showAdResult(true,"1 ad counted successfully. Your total ad count has been updated.");
-      }
-    }catch(err){
-      render();
-      showAdResult(false,err.message||"Your ad count could not be updated. Please try again.");
-    }finally{
-      checkingReturn=false;
-      render();
-    }
-  }
-
-  async function adminLogin(){
-    const password=document.getElementById("adminPassword").value;
-    const error=document.getElementById("adminError");
-    if(!password){error.textContent="Enter the admin password.";return}
-    error.textContent="";
-    try{
-      const data=await api("/api/admin/login",{method:"POST",body:JSON.stringify({password})});
-      adminToken=data.adminToken;
-      document.getElementById("adminPassword").value="";
-      hide(adminLoginModal);
-      show(adminModal);
-      await loadUsers();
-    }catch(err){error.textContent=err.message}
-  }
-
-  async function loadUsers(){
-    const list=document.getElementById("adminList");
-    const summary=document.getElementById("adminSummary");
-    list.innerHTML="<div class='small'>Loading users...</div>";
-    try{
-      const data=await api("/api/admin/users",{headers:{"x-admin-token":adminToken}});
-      summary.textContent=`${data.users.length} registered user${data.users.length===1?"":"s"}`;
-      if(!data.users.length){list.innerHTML="<div class='small'>No users yet.</div>";return}
-      list.innerHTML=data.users.map(user=>`
-        <div class="user-row">
-          <div class="user-info">
-            <div class="user-name">${escapeHtml(user.name)}</div>
-            <div class="user-ads">${Number(user.adsCount).toLocaleString()} ads watched</div>
-          </div>
-          <button class="reset" data-reset="${user.id}">Reset</button>
-        </div>
-      `).join("");
-      list.querySelectorAll("[data-reset]").forEach(btn=>{
-        btn.addEventListener("click",()=>resetUser(btn.dataset.reset,btn));
+    if (existing.rows[0]) {
+      return res.status(409).json({
+        ok: false,
+        error: "This name already has an account. Please use Check Account."
       });
-    }catch(err){
-      summary.textContent="Unable to load users.";
-      list.innerHTML=`<div class="small error">${escapeHtml(err.message)}</div>`;
     }
-  }
 
-  async function resetUser(id,btn){
-    if(!confirm("Reset this user's total ad count to 0?"))return;
-    btn.disabled=true;
-    try{
-      await api("/api/admin/users/"+encodeURIComponent(id)+"/reset",{
-        method:"POST",
-        headers:{"x-admin-token":adminToken},
-        body:"{}"
-      });
-      toast("User ad count reset to 0.");
-      if(account && String(account.id)===String(id)){
-        account.adsCount=0;breakUntil=0;render();
+    const created = await pool.query(
+      `INSERT INTO job_accounts (name, name_key)
+       VALUES ($1, $2)
+       RETURNING id, name, ads_count`,
+      [name, nameKey]
+    );
+
+    const account = created.rows[0];
+    setSessionCookie(res, account.id);
+
+    res.status(201).json({
+      ok: true,
+      account: {
+        id: account.id,
+        name: account.name,
+        adsCount: Number(account.ads_count)
       }
-      await loadUsers();
-    }catch(err){toast(err.message);btn.disabled=false}
+    });
+  } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({ ok: false, error: "This name already has an account." });
+    }
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Could not create account." });
+  }
+});
+
+// Returning user checks their name. The backend account is opened only if it exists.
+app.post("/api/account/check", async (req, res) => {
+  const name = normalizeName(req.body?.name);
+  if (!validName(name)) {
+    return res.status(400).json({ ok: false, error: "Please enter a valid name." });
   }
 
-  document.getElementById("accountAction").addEventListener("click",saveOrCheck);
-  document.getElementById("nameInput").addEventListener("keydown",e=>{if(e.key==="Enter")saveOrCheck()});
-  document.getElementById("watch").addEventListener("click",openAd);
+  const nameKey = name.toLocaleLowerCase("en-US");
 
-  document.getElementById("profileBtn").addEventListener("click",()=>show(profileModal));
-  document.getElementById("profileClose").addEventListener("click",()=>hide(profileModal));
-  document.getElementById("adminOpen").addEventListener("click",()=>{hide(profileModal);show(adminLoginModal)});
-  document.getElementById("adminLoginClose").addEventListener("click",()=>hide(adminLoginModal));
-  document.getElementById("adminLogin").addEventListener("click",adminLogin);
-  document.getElementById("adminPassword").addEventListener("keydown",e=>{if(e.key==="Enter")adminLogin()});
-  document.getElementById("adminClose").addEventListener("click",()=>hide(adminModal));
-  document.getElementById("adminRefresh").addEventListener("click",loadUsers);
+  try {
+    const result = await pool.query(
+      `SELECT id, name, ads_count
+       FROM job_accounts
+       WHERE name_key = $1 AND is_active = TRUE`,
+      [nameKey]
+    );
 
-  document.getElementById("logoutBtn").addEventListener("click",async()=>{
-    try{await api("/api/logout",{method:"POST"})}catch{}
-    account=null;adminToken=null;
-    hide(profileModal);
-    document.getElementById("accountTitle").textContent="Enter Your Name";
-    document.getElementById("accountText").textContent="Create your job account. Your ad count will be stored securely on the server.";
-    document.getElementById("accountAction").textContent="Save";
-    document.getElementById("nameInput").value="";
-    render();show(accountModal);
-  });
+    if (!result.rows[0]) {
+      return res.status(404).json({
+        ok: false,
+        error: "No account was found with this name."
+      });
+    }
 
-  document.addEventListener("visibilitychange",()=>{
-    if(document.visibilityState==="hidden" && pending){
-      leftPageForAd=true;
-    }else if(document.visibilityState==="visible" && pending && leftPageForAd){
-      checkReturn();
+    const account = result.rows[0];
+    setSessionCookie(res, account.id);
+
+    res.json({
+      ok: true,
+      account: {
+        id: account.id,
+        name: account.name,
+        adsCount: Number(account.ads_count)
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Could not check account." });
+  }
+});
+
+app.get("/api/account/me", requireAccount, (req, res) => {
+  res.json({
+    ok: true,
+    account: {
+      id: req.account.id,
+      name: req.account.name,
+      adsCount: Number(req.account.ads_count)
     }
   });
-  window.addEventListener("focus",()=>{
-    if(pending && leftPageForAd && document.visibilityState==="visible")checkReturn();
-  });
-  window.addEventListener("pageshow",()=>{
-    if(pending && leftPageForAd && document.visibilityState==="visible")checkReturn();
-  });
-  document.getElementById("resultClose").addEventListener("click",()=>hide(document.getElementById("resultModal")));
+});
 
-  clearInterval(tickTimer);
-  tickTimer=setInterval(()=>{
-    if(breakUntil && secondsLeft()===0){breakUntil=0;toast("Break finished — unlocked!")}
-    render();
-  },500);
+// The client calls this only after the 8-second ad-return check succeeds.
+app.post("/api/account/me/increment-ad", requireAccount, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE job_accounts
+       SET ads_count = ads_count + 1, updated_at = NOW()
+       WHERE id = $1 AND is_active = TRUE
+       RETURNING id, name, ads_count`,
+      [req.account.id]
+    );
 
-  boot();
-})();
+    const account = result.rows[0];
+    res.json({
+      ok: true,
+      account: {
+        id: account.id,
+        name: account.name,
+        adsCount: Number(account.ads_count)
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Could not update ad count." });
+  }
+});
+
+app.post("/api/logout", (req, res) => {
+  clearSessionCookie(res);
+  res.json({ ok: true });
+});
+
+// Admin password is NEVER placed in index.html.
+// The frontend receives only a short-lived signed admin token after this check.
+app.post("/api/admin/login", adminLimiter, (req, res) => {
+  const password = String(req.body?.password || "");
+  if (!password) return res.status(400).json({ ok: false, error: "Password is required." });
+
+  const a = Buffer.from(password);
+  const b = Buffer.from(ADMIN_PASSWORD);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ ok: false, error: "Incorrect admin password." });
+  }
+
+  const token = sign("admin:" + ADMIN_PASSWORD);
+  res.json({ ok: true, adminToken: token });
+});
+
+app.get("/api/admin/users", requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, name, ads_count, created_at, updated_at
+      FROM job_accounts
+      WHERE is_active = TRUE
+      ORDER BY created_at DESC
+    `);
+
+    res.json({
+      ok: true,
+      users: result.rows.map(row => ({
+        id: row.id,
+        name: row.name,
+        adsCount: Number(row.ads_count),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }))
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Could not load users." });
+  }
+});
+
+app.post("/api/admin/users/:id/reset", requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ ok: false, error: "Invalid user ID." });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE job_accounts
+       SET ads_count = 0, updated_at = NOW()
+       WHERE id = $1 AND is_active = TRUE
+       RETURNING id, name, ads_count`,
+      [id]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ ok: false, error: "User not found." });
+    }
+
+    res.json({
+      ok: true,
+      message: "Ad count reset successfully.",
+      account: {
+        id: result.rows[0].id,
+        name: result.rows[0].name,
+        adsCount: Number(result.rows[0].ads_count)
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Could not reset user." });
+  }
+});
+
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ ok: false, error: "Unexpected server error." });
+});
+
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Ad Tracker backend running on port ${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error("Database initialization failed:", err);
+    process.exit(1);
+  });
