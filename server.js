@@ -32,6 +32,21 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "20kb" }));
 
+// Parse cookies used by the account session (no extra package required).
+app.use((req, res, next) => {
+  req.cookies = {};
+  const header = req.headers.cookie || "";
+  for (const part of header.split(";")) {
+    const index = part.indexOf("=");
+    if (index < 0) continue;
+    const key = part.slice(0, index).trim();
+    const value = part.slice(index + 1).trim();
+    try { req.cookies[key] = decodeURIComponent(value); }
+    catch { req.cookies[key] = value; }
+  }
+  next();
+});
+
 const generalLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 120,
@@ -49,6 +64,10 @@ const adminLimiter = rateLimit({
 app.use("/api/", generalLimiter);
 
 const COOKIE_NAME = "job_account_session";
+const MIN_AD_WATCH_MS = 8000;
+const MAX_AD_SESSION_MS = 60 * 60 * 1000;
+// One active, one-use ad session per account. Tokens expire after one hour.
+const activeAdSessions = new Map();
 
 function normalizeName(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
@@ -304,8 +323,36 @@ app.get("/api/account/me", requireAccount, (req, res) => {
   });
 });
 
-// The client calls this only after the 8-second ad-return check succeeds.
+// Frontend calls this immediately before opening the ad in a new tab.
+app.post("/api/account/me/start-ad", requireAccount, (req, res) => {
+  const now = Date.now();
+  const token = crypto.randomBytes(32).toString("hex");
+  activeAdSessions.set(String(req.account.id), { token, startedAt: now, used: false });
+  res.json({ ok: true, adToken: token });
+});
+
+// Count only a matching, unused server-issued token after at least 8 seconds.
+// The token is consumed synchronously before the database call, blocking duplicate events.
 app.post("/api/account/me/increment-ad", requireAccount, async (req, res) => {
+  const key = String(req.account.id);
+  const session = activeAdSessions.get(key);
+  const suppliedToken = String(req.body?.adToken || "");
+
+  if (!session || !suppliedToken || suppliedToken !== session.token || session.used) {
+    return res.status(400).json({ ok: false, error: "Ad session is invalid or already used. Please open the ad again." });
+  }
+  if (Date.now() - session.startedAt < MIN_AD_WATCH_MS) {
+    return res.status(400).json({ ok: false, error: "Minimum ad watch time is 8 seconds." });
+  }
+  if (Date.now() - session.startedAt > MAX_AD_SESSION_MS) {
+    activeAdSessions.delete(key);
+    return res.status(400).json({ ok: false, error: "Ad session expired. Please open the ad again." });
+  }
+
+  // Consume before awaiting PostgreSQL so focus/pageshow/visibility events cannot double-count.
+  session.used = true;
+  activeAdSessions.delete(key);
+
   try {
     const result = await pool.query(
       `UPDATE job_accounts
@@ -316,6 +363,7 @@ app.post("/api/account/me/increment-ad", requireAccount, async (req, res) => {
     );
 
     const account = result.rows[0];
+    if (!account) return res.status(404).json({ ok: false, error: "Account not found." });
     res.json({
       ok: true,
       account: {
