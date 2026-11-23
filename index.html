@@ -3,105 +3,125 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#101712">
-<title>Premium</title>
+<meta name="theme-color" content="#080b12">
+<title>Ad Counter</title>
 <style>
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: radial-gradient(ellipse at top, #203a2a 0%, #101712 48%, #080b09 100%);
-    color: #f4f7f4; display: flex; align-items: center; justify-content: center; padding: 22px;
-  }
-  .app { width: 100%; max-width: 430px; }
-  .top { text-align: center; margin-bottom: 28px; }
-  .top .crown { font-size: 42px; filter: drop-shadow(0 5px 16px #d8ad4544); }
-  .top h1 { margin: 8px 0 5px; font-size: 28px; letter-spacing: 2px; font-weight: 800; }
-  .top p { margin: 0; color: #9ba99f; font-size: 14px; }
-  .card {
-    border: 1px solid #354b3b; border-radius: 24px; padding: 25px 22px;
-    background: linear-gradient(145deg, #1c2b21, #121a15); box-shadow: 0 20px 55px #0008;
-  }
-  .label { text-align: center; color: #b8c6bb; font-size: 12px; letter-spacing: 2.5px; text-transform: uppercase; }
-  .count { text-align: center; margin: 13px 0 4px; font-size: clamp(48px, 14vw, 68px); font-weight: 800; line-height: 1; color: #f0c85b; font-variant-numeric: tabular-nums; }
-  .caption { text-align: center; color: #9daaa1; font-size: 14px; margin-bottom: 22px; }
-  .progress-wrap { height: 8px; background: #334239; border-radius: 20px; overflow: hidden; margin-bottom: 24px; }
-  .progress { height: 100%; width: 100%; background: linear-gradient(90deg, #d6a832, #f6dc7e); border-radius: 20px; }
-  button {
-    width: 100%; border: 0; border-radius: 15px; padding: 17px 16px; color: #17180f;
-    background: linear-gradient(135deg, #f5d66e, #d8a936); font-size: 16px; font-weight: 800;
-    letter-spacing: .7px; cursor: pointer; box-shadow: 0 8px 24px #d4a83b2b; -webkit-tap-highlight-color: transparent;
-  }
-  button:active { transform: scale(.985); }
-  .note { text-align: center; color: #819187; font-size: 12px; margin: 16px 4px 0; line-height: 1.5; }
-  .status { min-height: 20px; text-align: center; color: #c9d5cb; font-size: 13px; margin-top: 12px; }
-  .reset-hint { text-align: center; color: #617066; font-size: 11px; margin-top: 22px; }
+:root{color-scheme:dark;--bg:#080b12;--panel:#111722;--muted:#8d9aab;--text:#f4f7fb;--accent:#8b7cff;--accent2:#4de2c1}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;min-height:100vh;min-height:100dvh;background:radial-gradient(ellipse at 50% 0%,#202044 0%,transparent 42%),linear-gradient(160deg,#090c14,#060810 75%);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);display:flex;align-items:center;justify-content:center;padding:22px;overflow-x:hidden}
+.wrap{width:min(100%,440px);position:relative}
+.top{display:flex;align-items:center;justify-content:center;margin-bottom:28px}
+.brand{display:flex;align-items:center;gap:11px;font-size:15px;font-weight:750;letter-spacing:2px;text-transform:uppercase}
+.logo{width:38px;height:38px;border-radius:13px;background:linear-gradient(135deg,#8d7cff,#43d9bd);display:grid;place-items:center;box-shadow:0 8px 30px #7668ff40;color:#080b12}
+.logo svg{width:21px;height:21px}
+.card{position:relative;overflow:hidden;border:1px solid #ffffff14;border-radius:30px;background:linear-gradient(145deg,#171d2aee,#0e131dee);padding:30px 24px 26px;box-shadow:0 25px 80px #0008, inset 0 1px #ffffff08}
+.card:before{content:"";position:absolute;width:260px;height:260px;border-radius:50%;background:#8b7cff15;filter:blur(2px);top:-120px;right:-100px;pointer-events:none}
+.label{color:#a6b1c3;font-size:12px;font-weight:650;letter-spacing:1.7px;text-transform:uppercase;text-align:center}
+.counter{font-size:clamp(64px,18vw,90px);font-weight:850;letter-spacing:-5px;text-align:center;line-height:1.14;margin:17px 0 8px;background:linear-gradient(180deg,#fff,#c7c5ff 90%);-webkit-background-clip:text;background-clip:text;color:transparent;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.sub{text-align:center;color:#8591a5;font-size:13px;margin-bottom:24px}
+.rule{height:1px;background:linear-gradient(90deg,transparent,#ffffff14,transparent);margin:22px 0}
+.button{width:100%;border:0;border-radius:17px;min-height:58px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:15px;font-weight:750;color:#080b12;background:linear-gradient(110deg,#9c8aff,#60e5c8);box-shadow:0 12px 30px #7168ff25;cursor:pointer;transition:transform .15s,filter .15s}
+.button:active{transform:scale(.98);filter:brightness(.94)}
+.button svg{width:19px;height:19px}
+.foot{text-align:center;color:#6e7b8e;font-size:11px;margin-top:19px;letter-spacing:.3px}
+.modal-bg{position:fixed;inset:0;background:#03050bbd;backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;padding:22px;z-index:10}
+.modal-bg.show{display:flex;animation:fade .18s ease}
+.modal{width:min(100%,360px);border-radius:25px;background:linear-gradient(150deg,#1a2130,#111722);border:1px solid #ffffff18;padding:26px 23px 22px;text-align:center;box-shadow:0 25px 90px #0009;animation:pop .22s ease}
+.micon{width:58px;height:58px;margin:0 auto 17px;border-radius:19px;display:grid;place-items:center;background:#8b7cff18;border:1px solid #8b7cff30;color:#a99eff}
+.micon.success{background:#4de2c115;border-color:#4de2c135;color:#4de2c1}
+.micon svg{width:27px;height:27px}
+.modal h2{font-size:19px;margin:0 0 9px;font-weight:780}
+.modal p{font-size:13px;line-height:1.55;color:#9ba7b9;margin:0 0 21px}
+.close{background:#202938;color:#e6ecf5;border:1px solid #ffffff0d;border-radius:13px;min-height:48px;width:100%;font-size:14px;font-weight:700;cursor:pointer}
+@keyframes fade{from{opacity:0}to{opacity:1}}@keyframes pop{from{transform:translateY(10px) scale(.97);opacity:.5}to{transform:translateY(0) scale(1);opacity:1}}
+@media(min-height:700px){.wrap{transform:translateY(-6px)}}
 </style>
 </head>
 <body>
-<main class="app">
-  <header class="top">
-    <div class="crown">👑</div>
-    <h1>PREMIUM</h1>
-    <p>Watch ads and build your progress</p>
-  </header>
-
-  <section class="card" aria-label="Premium progress">
-    <div class="label">Your total count</div>
-    <div class="count" id="count">0</div>
-    <div class="caption">Ads watched · Unlimited count</div>
-    <div class="progress-wrap"><div class="progress"></div></div>
-    <button id="watchBtn" type="button">▶ &nbsp; WATCH ADS</button>
-    <div class="status" id="status" aria-live="polite"></div>
+<main class="wrap">
+  <header class="top"><div class="brand"><span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5z"/><path d="m9 9 6 3-6 3z" fill="currentColor" stroke="none"/></svg></span><span>AD COUNTER</span></div></header>
+  <section class="card">
+    <div class="label">Total Ads Watched</div>
+    <div class="counter" id="count">0</div>
+    <div class="sub">Your activity is saved on this device</div>
+    <div class="rule"></div>
+    <button class="button" id="watch" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 5 11 7-11 7z" fill="currentColor" stroke="none"/></svg>Watch Ads</button>
   </section>
-
-  <p class="note">Tap Watch Ads to open the link. When you return to this app, your count increases by 1.</p>
-  <p class="reset-hint">Your count is saved on this device.</p>
+  <div class="foot">SECURE LOCAL COUNTER · NO ACCOUNT REQUIRED</div>
 </main>
-
+<div class="modal-bg" id="modalBg" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <div class="micon" id="modalIcon"><svg id="modalSvg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5m0 3h.01"/></svg></div>
+    <h2 id="modalTitle">Notice</h2><p id="modalText"></p><button class="close" id="modalClose">Close</button>
+  </div>
+</div>
 <script>
-(() => {
-  const COUNT_KEY = "premium_watch_count";
-  const PENDING_KEY = "premium_ad_pending";
-  const countEl = document.getElementById("count");
-  const statusEl = document.getElementById("status");
-  const watchBtn = document.getElementById("watchBtn");
-  const adLink = "https://asiafilm.org/4/17d6a856c8a2251142b070b3c3d63131";
+(()=>{
+  'use strict';
+  const AD_URL='https://asiafilm.org/4/17d6a856c8a2251142b070b3c3d63131';
+  const MIN_MS=8000;
+  const KEY='ad_counter_total_v1';
+  const BACKUP='ad_counter_backup_v1';
+  const countEl=document.getElementById('count');
+  const modalBg=document.getElementById('modalBg');
+  const modalTitle=document.getElementById('modalTitle');
+  const modalText=document.getElementById('modalText');
+  const modalIcon=document.getElementById('modalIcon');
+  const modalSvg=document.getElementById('modalSvg');
+  let attempt=null;
+  let waitingForReturn=false;
+  let openedAt=0;
+  let tabWasHidden=false;
 
-  function getCount() {
-    const value = Number.parseInt(localStorage.getItem(COUNT_KEY) || "0", 10);
-    return Number.isFinite(value) && value >= 0 ? value : 0;
+  function validCount(v){return Number.isSafeInteger(v)&&v>=0;}
+  function getStored(){
+    let a,b;try{a=localStorage.getItem(KEY);a=a===null?null:Number(a);}catch(e){a=null;}
+    try{b=localStorage.getItem(BACKUP);b=b===null?null:Number(b);}catch(e){b=null;}
+    if(validCount(a)&&validCount(b))return Math.max(a,b);
+    if(validCount(a))return a;
+    if(validCount(b))return b;
+    return 0;
   }
-  function showCount() {
-    countEl.textContent = getCount().toLocaleString();
+  let total=getStored();
+  function save(){
+    countEl.textContent=total.toLocaleString();
+    try{localStorage.setItem(KEY,String(total));localStorage.setItem(BACKUP,String(total));}catch(e){}
+    try{sessionStorage.setItem(KEY,String(total));}catch(e){}
   }
-  function recordReturn() {
-    if (localStorage.getItem(PENDING_KEY) !== "1") return;
-    localStorage.removeItem(PENDING_KEY);
-    localStorage.setItem(COUNT_KEY, String(getCount() + 1));
-    showCount();
-    statusEl.textContent = "Count +1 added!";
+  function showModal(title,message,success){
+    modalTitle.textContent=title;modalText.textContent=message;
+    modalIcon.classList.toggle('success',!!success);
+    modalSvg.innerHTML=success?'<path d="m5 12 4 4L19 6"/>':'<circle cx="12" cy="12" r="10"/><path d="M12 8v5m0 3h.01"/>';
+    modalBg.classList.add('show');
   }
-
-  watchBtn.addEventListener("click", () => {
-    localStorage.setItem(PENDING_KEY, "1");
-    statusEl.textContent = "Ad link opened. Return here to add +1.";
-    // Open from the direct button tap so browsers don't block it.
-    const opened = window.open(adLink, "_blank");
-    if (!opened) {
-      // If popups are blocked, navigate this tab to the link.
-      window.location.href = adLink;
-    }
+  function closeModal(){modalBg.classList.remove('show');}
+  document.getElementById('modalClose').addEventListener('click',closeModal);
+  modalBg.addEventListener('click',e=>{if(e.target===modalBg)closeModal();});
+  document.getElementById('watch').addEventListener('click',()=>{
+    if(waitingForReturn)return;
+    attempt={started:Date.now(),done:false};openedAt=attempt.started;tabWasHidden=false;waitingForReturn=true;
+    // Open directly from the user gesture so mobile browsers are less likely to block it.
+    const win=window.open(AD_URL,'_blank');
+    if(!win){waitingForReturn=false;attempt=null;showModal('Unable to open ad','Please allow pop-ups for this app/browser and try again.',false);return;}
+    try{win.opener=null;}catch(e){}
   });
-
-  // App/browser return detection. The pending marker is consumed once,
-  // so multiple focus/visibility events cannot add duplicate counts.
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) recordReturn();
+  function handleReturn(){
+    if(!waitingForReturn||!attempt||attempt.done)return;
+    // Only count after user leaves the app/tab and returns to it.
+    if(!tabWasHidden)return;
+    const elapsed=Date.now()-attempt.started;
+    attempt.done=true;waitingForReturn=false;
+    if(elapsed<MIN_MS){showModal('Not counted','You did not watch for the minimum 8 seconds. Your ad was not counted.',false);}
+    else{total+=1;save();showModal('1 Count Updated','Your total ads watched count has been updated by 1.',true);}
+    attempt=null;
+  }
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){if(waitingForReturn)tabWasHidden=true;}
+    else if(waitingForReturn&&tabWasHidden){handleReturn();}
   });
-  window.addEventListener("focus", recordReturn);
-  window.addEventListener("pageshow", recordReturn);
-
-  showCount();
+  window.addEventListener('focus',()=>{if(waitingForReturn&&tabWasHidden)handleReturn();});
+  window.addEventListener('pageshow',()=>save());
+  save();
 })();
 </script>
 </body>
