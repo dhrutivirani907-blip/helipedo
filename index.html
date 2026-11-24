@@ -3,614 +3,349 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#080b12">
-<title>Ad Tracker</title>
-<script src='//libtl.com/sdk.js' data-zone='12333273' data-sdk='show_12333273'></script>
+<meta name="theme-color" content="#06140e">
+<title>BabyDoge Rewards</title>
 <style>
-:root{--bg:#080b12;--panel:#111722;--panel2:#151e2b;--line:rgba(255,255,255,.08);--muted:#8c9aad;--white:#f6f8fc;--green:#54e3a2;--green2:#16b978;--red:#ff6f7d}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#182535 0,transparent 48%),var(--bg);color:var(--white);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:22px}
-button,input{font:inherit}.app{width:min(100%,440px);margin:0 auto}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:25px}.brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.12em;font-size:14px}.logo{width:38px;height:38px;border-radius:13px;background:linear-gradient(145deg,#69f2b4,#16b978);display:grid;place-items:center;color:#072115;font-weight:900;box-shadow:0 8px 24px #19bd7b35}.status{border:1px solid var(--line);border-radius:30px;padding:8px 11px;color:#aab7c8;font-size:11px;letter-spacing:.08em}.status:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:7px;vertical-align:1px}.profile{width:42px;height:42px;border-radius:14px;border:1px solid var(--line);background:#121c28;color:white;cursor:pointer;font-size:20px;display:grid;place-items:center}.profile:hover{border-color:#54e3a277}h1{font-size:26px;letter-spacing:-.04em;margin:0 0 8px}.sub{color:var(--muted);font-size:14px;margin:0 0 25px;line-height:1.5}.counter-card{position:relative;overflow:hidden;background:linear-gradient(145deg,#172333,#101722 68%);border:1px solid rgba(105,242,180,.15);border-radius:27px;padding:27px 24px 25px;box-shadow:0 24px 70px #0006}.counter-card:before{content:"";position:absolute;right:-70px;top:-100px;width:220px;height:220px;border-radius:50%;background:#36d89115;filter:blur(2px)}.count-label{font-size:12px;letter-spacing:.15em;color:#9bacbf;font-weight:700}.count{font-size:76px;font-weight:850;letter-spacing:-.07em;line-height:1.15;margin:12px 0 6px;background:linear-gradient(180deg,#fff,#c7d6e7);-webkit-background-clip:text;color:transparent;font-variant-numeric:tabular-nums}.count-caption{font-size:13px;color:#9bacbf}.progress-wrap{margin-top:23px}.progress-head{display:flex;justify-content:space-between;font-size:12px;color:#9bacbf;margin-bottom:9px}.progress{height:6px;border-radius:10px;background:#283342;overflow:hidden}.bar{height:100%;width:0;background:linear-gradient(90deg,#2bc884,#8bf5c5);border-radius:10px;transition:width .35s}.break-note{display:flex;align-items:center;gap:8px;color:#8293a8;font-size:12px;margin-top:12px}.action{width:100%;border:0;border-radius:17px;margin-top:17px;padding:18px 15px;background:linear-gradient(135deg,#56e6a6,#20c17e);color:#062418;font-weight:850;font-size:16px;letter-spacing:.01em;box-shadow:0 12px 32px #24c98225;cursor:pointer;transition:transform .12s,filter .2s}.action:active{transform:scale(.985)}.action:disabled{background:linear-gradient(135deg,#273443,#1b2633);color:#9eacbd;box-shadow:none;cursor:not-allowed}.button-icon{font-size:17px;margin-right:7px}.secondary{margin-top:18px;display:flex;justify-content:space-between;color:#718197;font-size:11px;letter-spacing:.04em}.modal-backdrop{position:fixed;inset:0;background:#02050bcc;backdrop-filter:blur(9px);display:none;align-items:center;justify-content:center;padding:22px;z-index:20}.modal-backdrop.show{display:flex}.modal{width:min(100%,360px);background:linear-gradient(145deg,#182333,#101720);border:1px solid var(--line);border-radius:25px;padding:27px 24px;text-align:center;box-shadow:0 30px 90px #0009;animation:pop .22s ease-out}.modal-icon{width:58px;height:58px;border-radius:18px;margin:0 auto 15px;background:#1d3a31;display:grid;place-items:center;color:var(--green);font-size:25px}.modal h2{font-size:19px;margin:0 0 9px}.modal p{font-size:13px;color:#9eacbd;line-height:1.6;margin:0 0 21px}.field{width:100%;padding:14px 15px;border-radius:13px;border:1px solid #ffffff12;background:#0b111a;color:white;outline:none;margin-bottom:11px}.field:focus{border-color:#54e3a277}.modal button{width:100%;padding:13px;border-radius:13px;border:1px solid #ffffff15;background:#202c3a;color:white;font-weight:750;cursor:pointer}.modal button.primary{background:var(--green);border:0;color:#062418}.modal button.danger{background:#3a1e25;color:#ffb8c0;border-color:#ff6f7d33}.modal button+button{margin-top:9px}.hidden{display:none!important}.checking{display:flex;flex-direction:column;align-items:center;gap:14px}.spinner{width:38px;height:38px;border-radius:50%;border:3px solid #ffffff15;border-top-color:var(--green);animation:spin .8s linear infinite}.admin-list{max-height:360px;overflow:auto;text-align:left;margin:15px -5px 0;padding:0 5px}.user-row{padding:14px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}.user-info{min-width:0}.user-name{font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.user-ads{font-size:12px;color:#8fa0b3;margin-top:4px}.reset{width:auto!important;padding:9px 12px!important;border-radius:10px!important;background:#2b1820!important;color:#ff9eaa!important;border:1px solid #ff6f7d33!important;flex:none}.admin-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.admin-head h2{margin:0}.small{font-size:11px;color:#7f91a5}.error{color:#ff9eaa!important}.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom));left:50%;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#182635;border:1px solid #ffffff16;border-radius:15px;padding:12px 16px;color:#e8f5ee;font-size:13px;box-shadow:0 15px 40px #0007;transition:.25s;z-index:30;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}@keyframes pop{from{transform:translateY(8px) scale(.97);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:380px){.count{font-size:66px}.counter-card{padding:23px 20px}}
-
-.result-modal .modal-icon.success{background:#1d3a31;color:var(--green)}
-.result-modal .modal-icon.failure{background:#3a1e25;color:#ff9eaa}
+:root{
+  --bg:#06140e;--bg2:#0a1d14;--panel:#0d2419;--panel2:#102c20;
+  --line:rgba(111,255,185,.14);--muted:#8fa99b;--white:#f5fff9;
+  --green:#55f0a6;--green2:#16bd73;--deep:#062719;--danger:#ff7380;
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:
+radial-gradient(circle at 50% -10%,#1b5a3b 0,transparent 38%),
+radial-gradient(circle at 0 40%,#0c3020 0,transparent 32%),var(--bg);
+color:var(--white);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:18px}
+button{font:inherit}
+.app{width:min(100%,460px);margin:0 auto;padding-bottom:30px}
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.08em;font-size:13px}
+.logo{width:40px;height:40px;border-radius:14px;background:linear-gradient(145deg,#7affc0,#16b978);display:grid;place-items:center;color:#042216;font-size:20px;box-shadow:0 10px 30px #16bd7350}
+.status{border:1px solid var(--line);border-radius:30px;padding:7px 10px;color:#a9c0b2;font-size:10px;letter-spacing:.08em}
+.status:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:6px}
+.profile{width:42px;height:42px;border-radius:14px;border:1px solid var(--line);background:#0c2118;color:white;cursor:pointer;font-size:20px;display:grid;place-items:center}
+h1{font-size:27px;letter-spacing:-.05em;margin:0 0 7px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 20px;line-height:1.55}
+.page{display:none;animation:pageIn .22s ease}
+.page.active{display:block}
+.card{position:relative;overflow:hidden;background:linear-gradient(145deg,#123322,#0a1b13 72%);border:1px solid var(--line);border-radius:27px;padding:22px;box-shadow:0 25px 70px #0008}
+.card:before{content:"";position:absolute;width:190px;height:190px;right:-80px;top:-95px;border-radius:50%;background:#55f0a617;filter:blur(2px);pointer-events:none}
+.coin-card{padding:25px 22px 19px}
+.label{font-size:11px;letter-spacing:.16em;color:#9ab5a6;font-weight:800}
+.coin-row{display:flex;align-items:center;gap:12px;margin-top:10px}
+.coin-icon{width:46px;height:46px;border-radius:15px;background:linear-gradient(145deg,#73ffc0,#20c77f);display:grid;place-items:center;font-size:23px;color:#052719;box-shadow:0 8px 24px #18c57a35}
+.coin-balance{font-size:46px;line-height:1;font-weight:900;letter-spacing:-.06em;font-variant-numeric:tabular-nums}
+.coin-caption{color:#8da899;font-size:12px;margin:9px 0 0 58px}
+.withdraw{margin-top:18px;width:100%;border:1px solid #55f0a633;border-radius:14px;background:#0a2117;color:#c9f9df;padding:12px;font-weight:800;cursor:pointer}
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.action-box{min-height:116px;border:1px solid var(--line);border-radius:21px;background:linear-gradient(145deg,#102d20,#0b1f16);padding:18px 15px;text-align:left;color:white;cursor:pointer;box-shadow:0 16px 40px #0005;transition:.15s}
+.action-box:active{transform:scale(.98)}
+.action-box .mini-icon{font-size:23px;margin-bottom:13px}
+.action-box b{display:block;font-size:14px}
+.action-box span{display:block;color:#87a797;font-size:11px;margin-top:5px;line-height:1.4}
+.ticket-box{margin-top:14px;text-align:center;padding:17px;border:1px solid #55f0a62a;border-radius:20px;background:linear-gradient(145deg,#143b28,#0b2117)}
+.ticket-value{font-size:30px;font-weight:900;margin-top:5px}
+.ticket-value small{font-size:12px;color:#8eaa9a;letter-spacing:.1em}
+.history-card{margin-top:14px}
+.section-title{font-size:13px;font-weight:850;letter-spacing:.04em}
+.history{margin-top:12px;display:grid;gap:8px;max-height:260px;overflow:auto}
+.history-item{display:flex;justify-content:space-between;gap:10px;padding:12px;border-radius:14px;background:#0a1d14;border:1px solid #ffffff08}
+.history-item b{font-size:12px}.history-item span{font-size:10px;color:#80988a}
+.back{border:0;background:transparent;color:#8eb9a3;padding:4px 0;margin-bottom:13px;cursor:pointer;font-weight:800}
+.offer-card{text-align:center;padding:24px 20px}
+.offer-top{display:flex;align-items:center;justify-content:center;gap:10px}
+.offer-amount{font-size:31px;font-weight:950;letter-spacing:-.04em}
+.offer-note{margin:18px 0;padding:14px;border-radius:15px;background:#0a1d14;border:1px solid #ffffff09;color:#c7e4d4;font-size:12px;line-height:1.55}
+.price-box{display:inline-flex;align-items:center;gap:7px;border:1px solid #55f0a638;background:#0a2117;border-radius:13px;padding:11px 14px;font-weight:850;color:#bdf7d8}
+.big-action{width:100%;border:0;border-radius:17px;padding:17px;background:linear-gradient(135deg,#68f8b3,#16bd73);color:#032216;font-weight:950;cursor:pointer;box-shadow:0 14px 35px #16bd7340}
+.big-action:disabled{background:#1b3328;color:#789486;box-shadow:none;cursor:not-allowed}
+.ticket-balance{margin:15px 0 18px;color:#9bb7a7;font-size:12px}
+.ticket-balance b{color:white;font-size:20px}
+.ad-card .ad-reward{display:flex;align-items:center;justify-content:center;gap:10px}
+.ad-symbol{width:54px;height:54px;border-radius:17px;background:#123a28;display:grid;place-items:center;color:var(--green);font-size:25px}
+.ad-reward strong{font-size:32px}
+.notice{margin-top:15px;padding:13px;border-radius:14px;background:#0a1d14;border:1px solid #ffffff09;color:#b8d4c4;font-size:11px;line-height:1.55}
+.ad-btn{margin-top:18px}
+.daily{font-size:11px;color:#7f9a8b;text-align:center;margin-top:11px}
+.modal-backdrop{position:fixed;inset:0;background:#020a06dd;backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px;z-index:20}
+.modal-backdrop.show{display:flex}
+.modal{width:min(100%,380px);background:linear-gradient(145deg,#123322,#091a12);border:1px solid var(--line);border-radius:25px;padding:25px;text-align:center;box-shadow:0 30px 90px #000b;animation:pop .22s ease}
+.modal-icon{width:58px;height:58px;border-radius:18px;margin:0 auto 14px;background:#16402b;display:grid;place-items:center;color:var(--green);font-size:24px}
+.modal h2{font-size:19px;margin:0 0 8px}.modal p{font-size:12px;color:#9bb4a5;line-height:1.6;margin:0 0 18px}
+.field{width:100%;padding:13px;border-radius:13px;border:1px solid #ffffff12;background:#07130e;color:white;outline:none;margin-bottom:10px}
+.modal button{width:100%;padding:13px;border-radius:13px;border:1px solid #ffffff14;background:#1a3327;color:white;font-weight:800;cursor:pointer}
+.modal button.primary{background:var(--green);color:#052417;border:0}
+.modal button+button{margin-top:9px}
+.error{color:#ff9eaa!important}.small{font-size:10px!important}
+.admin-list{max-height:370px;overflow:auto;text-align:left;margin-top:12px}
+.user-row{padding:13px 0;border-bottom:1px solid var(--line)}
+.user-name{font-weight:850;font-size:13px}.user-detail{font-size:11px;color:#8fa99b;margin-top:5px;line-height:1.55}
+.toast{position:fixed;bottom:20px;left:50%;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#123322;border:1px solid #55f0a62a;border-radius:15px;padding:12px 16px;color:#eafff2;font-size:12px;box-shadow:0 15px 40px #0008;transition:.25s;z-index:40;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+@keyframes pop{from{transform:translateY(8px) scale(.97);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+@keyframes pageIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@media(max-width:380px){.coin-balance{font-size:39px}}
 </style>
 </head>
 <body>
 <main class="app">
 <header class="top">
-  <div class="brand"><div class="logo">A</div> AD TRACKER</div>
-  <div style="display:flex;gap:8px;align-items:center">
-    <div class="status" id="status">CONNECTING</div>
-    <button class="profile" id="profileBtn" aria-label="Profile">♙</button>
-  </div>
+  <div class="brand"><div class="logo">🐶</div> BABYDOGE REWARDS</div>
+  <div style="display:flex;gap:8px;align-items:center"><div class="status" id="status">CONNECTING</div><button type="button" class="profile" id="profileBtn">♙</button></div>
 </header>
-<h1>Your ad activity</h1>
-<p class="sub">Watch a Monetag video ad. Ads count only after the minimum watch time. A 30-second cooldown applies after each counted ad.</p>
-<section class="counter-card">
-  <div class="count-label">TOTAL ADS WATCHED</div>
-  <div class="count" id="count">0</div>
-  <div class="count-caption">Ads completed on your backend account</div>
-  <div style="margin-top:10px;font-size:15px;font-weight:800;color:#54e3a2">Daily Ads: <span id="dailyCount">0</span>/100</div>
-  <div class="progress-wrap">
-    <div class="progress-head"><span id="progressLabel">Progress to break</span><span id="progressNum">0 / 10</span></div>
-    <div class="progress"><div class="bar" id="bar"></div></div>
+
+<section id="homePage" class="page active">
+  <h1>BabyDoge Rewards</h1>
+  <p class="sub">Earn tickets from ads, unlock Super Offers and grow your BabyDoge balance.</p>
+
+  <div class="card coin-card">
+    <div class="label">TOTAL BABYDOGE COIN</div>
+    <div class="coin-row"><div class="coin-icon">🐶</div><div class="coin-balance" id="coinBalance">0</div></div>
+    <div class="coin-caption">Available BabyDoge balance</div>
+    <button type="button" class="withdraw" id="withdrawBtn">↗ Withdraw</button>
   </div>
-  <div class="break-note"><span>◇</span><span>5-minute break after every 10 ads</span></div>
+
+  <div class="action-grid">
+    <button type="button" class="action-box" id="offerOpen"><div class="mini-icon">⚡</div><b>Unlock Super Offer</b><span>Use tickets to unlock a coin reward.</span></button>
+    <button type="button" class="action-box" id="ticketOpen"><div class="mini-icon">🎟</div><b>Earn Ticket</b><span>Watch ads for 1 ticket each.</span></button>
+  </div>
+
+  <div class="ticket-box">
+    <div class="label">TOTAL TICKET BALANCE</div>
+    <div class="ticket-value"><span id="ticketBalance">0</span> <small>TICKETS</small></div>
+  </div>
+
+  <div class="card history-card">
+    <div class="section-title">Super Offer History</div>
+    <div class="history" id="historyHome"><div style="color:#718d7d;font-size:11px">No Super Offer completed yet.</div></div>
+  </div>
 </section>
-<button class="action" id="watch"><span class="button-icon">▶</span>Watch Ads</button>
-<div class="secondary"><span>BACKEND ACCOUNT</span><span id="accountName">Not connected</span></div>
+
+<section id="offerPage" class="page">
+  <button type="button" class="back" data-back>← Back to Home</button>
+  <h1>Super Offer</h1>
+  <p class="sub">Unlock the offer with tickets and claim your BabyDoge coins.</p>
+  <div class="card offer-card">
+    <div class="offer-top"><div class="coin-icon">🐶</div><div class="offer-amount">+7,500,000</div></div>
+    <div class="price-box">🎟 Price = 30 Tickets</div>
+    <div class="ticket-balance">Your ticket balance: <b id="offerTickets">0</b></div>
+    <div class="offer-note"><b>Unlock Super Offer</b><br>Unlock this offer and get <b>7,500,000 BabyDoge coin</b>.</div>
+    <button type="button" class="big-action" id="unlockOfferBtn">Unlock Super Offer</button>
+  </div>
+  <div class="card history-card">
+    <div class="section-title">Super Offer History</div>
+    <div class="history" id="historyOffer"></div>
+  </div>
+</section>
+
+<section id="ticketPage" class="page">
+  <button type="button" class="back" data-back>← Back to Home</button>
+  <h1>Earn Ticket</h1>
+  <p class="sub">Watch the ad for at least 8 seconds and receive 1 ticket.</p>
+  <div class="card offer-card ad-card">
+    <div class="ad-reward"><div class="ad-symbol">🎟</div><strong>+1</strong></div>
+    <div class="notice"><b>Watch Ads minimum 8 seconds</b><br>1 Ads = 1 Ticket</div>
+    <button type="button" class="big-action ad-btn" id="watchTicketBtn">▶ Watch Ads Get 1 Ticket</button>
+    <div class="daily">Daily: <span id="dailyCount">0</span>/100 ads</div>
+    <div class="ticket-balance">Total ticket balance: <b id="ticketPageBalance">0</b></div>
+  </div>
+  <div class="card history-card">
+    <div class="section-title">Super Offer History</div>
+    <div class="history" id="historyTicket"></div>
+  </div>
+</section>
 </main>
 
-<!-- Account popup -->
-<div class="modal-backdrop" id="accountModal">
-  <div class="modal" id="accountBox">
-    <div class="modal-icon">A</div>
-    <h2 id="accountTitle">Enter Your Name</h2>
-    <p id="accountText">Create your job account. Your ad count will be stored securely on the server.</p>
-    <input class="field" id="nameInput" maxlength="40" autocomplete="name" placeholder="Enter your name">
-    <button class="primary" id="accountAction">Save</button>
-    <p class="small" id="accountError"></p>
-  </div>
-</div>
+<!-- Account -->
+<div class="modal-backdrop" id="accountModal"><div class="modal">
+  <div class="modal-icon">🐶</div><h2 id="accountTitle">Enter Your Name</h2>
+  <p id="accountText">Create your account. Your rewards are stored on the server.</p>
+  <input class="field" id="nameInput" maxlength="40" placeholder="Enter your name">
+  <button type="button" class="primary" id="accountAction">Save</button><p class="small error" id="accountError"></p>
+</div></div>
 
-<!-- Checking popup -->
-<div class="modal-backdrop" id="checkingModal">
-  <div class="modal">
-    <div class="checking">
-      <div class="spinner"></div>
-      <h2 style="margin:0">Checking Your Job Account</h2>
-      <p style="margin:0">Please wait while we securely check your backend account.</p>
-    </div>
-  </div>
-</div>
+<div class="modal-backdrop" id="checkingModal"><div class="modal">
+  <div class="modal-icon">◌</div><h2>Checking Account</h2><p>Please wait while we securely check your backend account.</p>
+</div></div>
 
-<!-- Profile popup -->
-<div class="modal-backdrop" id="profileModal">
-  <div class="modal">
-    <div class="modal-icon">♙</div>
-    <h2>Profile</h2>
-    <p id="profileInfo">Not connected</p>
-    <button class="primary" id="adminOpen">Admin Panel</button>
-    <button id="logoutBtn">Change Account</button>
-    <button id="profileClose">Close</button>
-  </div>
-</div>
+<!-- Profile -->
+<div class="modal-backdrop" id="profileModal"><div class="modal">
+  <div class="modal-icon">♙</div><h2>Profile</h2><p id="profileInfo">Not connected</p>
+  <button type="button" class="primary" id="adminOpen">Admin Panel</button><button type="button" id="logoutBtn">Change Account</button><button type="button" id="profileClose">Close</button>
+</div></div>
 
-<!-- Admin password -->
-<div class="modal-backdrop" id="adminLoginModal">
-  <div class="modal">
-    <div class="modal-icon">🔐</div>
-    <h2>Admin Access</h2>
-    <p>Enter the admin password. The password is verified by the backend and is never stored in this app.</p>
-    <input class="field" id="adminPassword" type="password" autocomplete="current-password" placeholder="Admin password">
-    <button class="primary" id="adminLogin">Continue</button>
-    <button id="adminLoginClose">Cancel</button>
-    <p class="small error" id="adminError"></p>
-  </div>
-</div>
+<!-- Admin -->
+<div class="modal-backdrop" id="adminLoginModal"><div class="modal">
+  <div class="modal-icon">🔐</div><h2>Admin Access</h2><p>Enter the admin password.</p>
+  <input class="field" id="adminPassword" type="password" placeholder="Admin password">
+  <button type="button" class="primary" id="adminLogin">Continue</button><button type="button" id="adminLoginClose">Cancel</button>
+  <p class="small error" id="adminError"></p>
+</div></div>
 
-<!-- Admin panel -->
-<div class="modal-backdrop" id="adminModal">
-  <div class="modal" style="max-width:410px">
-    <div class="admin-head">
-      <h2>Admin Panel</h2>
-      <button id="adminRefresh" style="width:auto;padding:8px 11px">↻</button>
-    </div>
-    <div class="small" id="adminSummary">Loading users...</div>
-    <div class="admin-list" id="adminList"></div>
-    <button id="adminClose">Close</button>
-  </div>
-</div>
+<div class="modal-backdrop" id="adminModal"><div class="modal" style="max-width:420px">
+  <div style="display:flex;align-items:center;justify-content:space-between"><h2 style="margin:0">Admin Panel 4</h2><button type="button" id="adminRefresh" style="width:auto;padding:8px 11px">↻</button></div>
+  <p id="adminSummary" style="text-align:left;margin-top:8px">Loading...</p>
+  <div class="admin-list" id="adminList"></div><button type="button" id="adminClose">Close</button>
+</div></div>
 
-<!-- Ad result popup -->
-<div class="modal-backdrop" id="resultModal">
-  <div class="modal result-modal">
-    <div class="modal-icon" id="resultIcon">✓</div>
-    <h2 id="resultTitle">Ad Count Updated</h2>
-    <p id="resultText">Your ad has been counted successfully.</p>
-    <button class="primary" id="resultClose">Continue</button>
-  </div>
-</div>
-
+<!-- Result -->
+<div class="modal-backdrop" id="resultModal"><div class="modal">
+  <div class="modal-icon" id="resultIcon">✓</div><h2 id="resultTitle">Done</h2><p id="resultText"></p><button type="button" class="primary" id="resultClose">Continue</button>
+</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
 (() => {
-  "use strict";
+"use strict";
+const API="https://helipedo.onrender.com";
+const ADS_URL="https://auctionr.org/4/ae64da386ee63dd06a886a75a74a1631";
+const MIN_WATCH_MS=8000, COOLDOWN_MS=30000, DAILY_LIMIT=100, BREAK_EVERY=10, BREAK_MS=300000;
+const OFFER_COST=30, OFFER_REWARD=7500000;
+const $=id=>document.getElementById(id);
+const storage={get:k=>{try{return localStorage.getItem(k)||""}catch{return""}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}},remove:k=>{try{localStorage.removeItem(k)}catch{}}};
+let account=null, pendingAd=null, adBusy=false, finishingAd=false, accountBusy=false, adminToken="", adminBusy=false, toastTimer, cooldownUntil=0, breakUntil=0, ticker=null, offerUnlocked=false;
 
-  // Update this URL only if your deployed backend changes.
-  const API = "https://helipedo.onrender.com";
-  const COOLDOWN_MS = 30000;
-  const MIN_WATCH_MS = 10000;
-  const DAILY_LIMIT = 100;
-  const BREAK_EVERY = 10;
-  const BREAK_MS = 300000;
-
-  const $ = (id) => document.getElementById(id);
-  const els = {
-    status: $("status"), count: $("count"), dailyCount: $("dailyCount"), progressLabel: $("progressLabel"),
-    progressNum: $("progressNum"), bar: $("bar"), watch: $("watch"),
-    accountName: $("accountName"), accountModal: $("accountModal"),
-    accountTitle: $("accountTitle"), accountText: $("accountText"),
-    nameInput: $("nameInput"), accountAction: $("accountAction"),
-    accountError: $("accountError"), checkingModal: $("checkingModal"),
-    profileBtn: $("profileBtn"), profileModal: $("profileModal"),
-    profileInfo: $("profileInfo"), adminOpen: $("adminOpen"),
-    logoutBtn: $("logoutBtn"), profileClose: $("profileClose"),
-    adminLoginModal: $("adminLoginModal"), adminPassword: $("adminPassword"),
-    adminLogin: $("adminLogin"), adminLoginClose: $("adminLoginClose"),
-    adminError: $("adminError"), adminModal: $("adminModal"),
-    adminSummary: $("adminSummary"), adminList: $("adminList"),
-    adminRefresh: $("adminRefresh"), adminClose: $("adminClose"),
-    resultModal: $("resultModal"), resultIcon: $("resultIcon"),
-    resultTitle: $("resultTitle"), resultText: $("resultText"),
-    resultClose: $("resultClose"), toast: $("toast")
-  };
-
-  let account = null;
-  let adminToken = "";
-  let pendingAd = null;
-  let adWindow = null;
-  let accountBusy = false;
-  let adminBusy = false;
-  let adBusy = false;
-  let toastTimer;
-  let breakUntil = 0;
-   let cooldownUntil = 0;
-   let cooldownTicker = null;
-
-  const storage = {
-    get(key) { try { return localStorage.getItem(key) || ""; } catch { return ""; } },
-    set(key, val) { try { localStorage.setItem(key, val); } catch {} },
-    remove(key) { try { localStorage.removeItem(key); } catch {} }
-  };
-
-  const token = () => storage.get("adtracker_session_token");
-  const setToken = (t) => storage.set("adtracker_session_token", t || "");
-  const clearToken = () => storage.remove("adtracker_session_token");
-
-  function showModal(id) { $(id)?.classList.add("show"); }
-  function hideModal(id) { $(id)?.classList.remove("show"); }
-  function toast(message) {
-    if (!els.toast) return;
-    els.toast.textContent = message;
-    els.toast.style.opacity = "1";
-    els.toast.style.transform = "translate(-50%,0)";
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => {
-      els.toast.style.opacity = "0";
-      els.toast.style.transform = "translate(-50%,20px)";
-    }, 2600);
+async function api(path,options={}){
+ const headers=Object.assign({"Content-Type":"application/json"},options.headers||{});
+ const t=storage.get("babydoge_session_token"); if(t) headers["X-Account-Token"]=t;
+ if(adminToken) headers["X-Admin-Token"]=adminToken;
+ const r=await fetch(API+path,{...options,headers,credentials:"omit"});
+ let d; try{d=await r.json()}catch{d={ok:false,error:`Server returned HTTP ${r.status}`}}
+ if(!r.ok||d?.ok===false){const e=new Error(d?.error||`Request failed (${r.status})`);e.status=r.status;throw e}
+ return d;
+}
+function show(id){$(id)?.classList.add("show")} function hide(id){$(id)?.classList.remove("show")}
+function toast(m){const e=$("toast");e.textContent=m;e.style.opacity=1;e.style.transform="translate(-50%,0)";clearTimeout(toastTimer);toastTimer=setTimeout(()=>{e.style.opacity=0;e.style.transform="translate(-50%,20px)"},2600)}
+function showResult(ok,title,msg){$("resultIcon").textContent=ok?"✓":"!";$("resultTitle").textContent=title;$("resultText").textContent=msg;show("resultModal")}
+function switchPage(id){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));$(id).classList.add("active");window.scrollTo({top:0,behavior:"smooth"});renderAll()}
+function setAccount(a){account=a;renderAll();$("status").textContent="CONNECTED";$("status").style.color="var(--green)"}
+function renderAll(){
+ if(!account)return;
+ offerUnlocked=Number(account.pendingOfferCount||0)>0;
+ $("coinBalance").textContent=Number(account.coinBalance||0).toLocaleString();
+ $("ticketBalance").textContent=Number(account.ticketBalance||0).toLocaleString();
+ $("offerTickets").textContent=Number(account.ticketBalance||0).toLocaleString();
+ $("ticketPageBalance").textContent=Number(account.ticketBalance||0).toLocaleString();
+ $("dailyCount").textContent=Number(account.dailyAdsCount||0).toLocaleString();
+ $("profileInfo").textContent=`${account.name} · ${Number(account.adsCount||0).toLocaleString()} ads · ${Number(account.referralsCount||0).toLocaleString()} referrals`;
+ $("unlockOfferBtn").disabled=!offerUnlocked && Number(account.ticketBalance||0)<OFFER_COST;
+ $("unlockOfferBtn").textContent=offerUnlocked?"Claim Coin":"Unlock Super Offer";
+ renderHistory(account.superOfferHistory||[]);
+ updateAdButton();
+}
+function renderHistory(items){
+ const targets=["historyHome","historyOffer","historyTicket"];
+ targets.forEach(id=>{$(id).replaceChildren();if(!items.length){$(id).innerHTML='<div style="color:#718d7d;font-size:11px">No Super Offer completed yet.</div>';return}
+ items.slice(0,30).forEach(x=>{const d=document.createElement("div");d.className="history-item";d.innerHTML=`<div><b>+${Number(x.rewardCoins||0).toLocaleString()} BabyDoge</b><br><span>${new Date(x.completedAt).toLocaleString()}</span></div><span>−${Number(x.ticketCost||0)} 🎟</span>`;$(id).append(d)})});
+}
+function updateAdButton(){
+ const b=$("watchTicketBtn"); if(!b)return;
+ const daily=Number(account?.dailyAdsCount||0);
+ if(pendingAd){b.disabled=false;b.textContent="⌛ Return to App";return}
+ if(daily>=DAILY_LIMIT){b.disabled=true;b.textContent="Daily Limit Reached";return}
+ const c=Math.max(0,cooldownUntil-Date.now()), br=Math.max(0,breakUntil-Date.now());
+ if(c){b.disabled=true;b.textContent=`Cooldown ${Math.ceil(c/1000)}s`;return}
+ if(br){b.disabled=true;b.textContent=`Break ${Math.ceil(br/1000)}s`;return}
+ b.disabled=adBusy;b.textContent=adBusy?"⌛ Opening Ad":"▶ Watch Ads Get 1 Ticket";
+}
+function setCooldown(ms){cooldownUntil=Date.now()+Math.max(0,ms);clearInterval(ticker);ticker=setInterval(()=>{updateAdButton();if(Date.now()>=cooldownUntil&&Date.now()>=breakUntil){clearInterval(ticker);ticker=null}},250);updateAdButton()}
+function accountPopup(mode="create"){accountBusy=false;$("accountError").textContent="";$("nameInput").value="";$("accountTitle").textContent=mode==="check"?"Check Your Account":"Enter Your Name";$("accountText").textContent=mode==="check"?"Enter the same name you used previously to reconnect to your account.":"Create your account. Your rewards are stored on the server.";$("accountAction").textContent=mode==="check"?"Check Account":"Save";$("accountAction").dataset.mode=mode;show("accountModal");setTimeout(()=>$("nameInput").focus(),100)}
+async function saveOrCheck(){
+ if(accountBusy)return;
+ const name=$("nameInput").value.trim();
+ if(!name){$("accountError").textContent="Please enter your name.";return}
+ accountBusy=true;
+ $("accountAction").disabled=true;
+ $("accountError").textContent="";
+ hide("accountModal");
+ show("checkingModal");
+ try{
+  let d;
+  const mode=$("accountAction").dataset.mode||"create";
+  if(mode==="check"){
+   d=await api("/api/account/check",{method:"POST",body:JSON.stringify({name})});
+  }else{
+   try{
+    d=await api("/api/account",{method:"POST",body:JSON.stringify({name})});
+   }catch(e){
+    if(e.status===409){
+     d=await api("/api/account/check",{method:"POST",body:JSON.stringify({name})});
+    }else{throw e}
+   }
   }
-
-  async function api(path, options = {}) {
-    const headers = Object.assign({ "Content-Type": "application/json" }, options.headers || {});
-    if (token()) headers["X-Account-Token"] = token();
-    if (adminToken) headers["X-Admin-Token"] = adminToken;
-    const response = await fetch(API + path, {
-      ...options, headers, credentials: "omit"
-    });
-    let data;
-    try { data = await response.json(); }
-    catch { data = { ok: false, error: `Server returned HTTP ${response.status}` }; }
-    if (!response.ok || data?.ok === false) {
-      const err = new Error(data?.error || `Request failed (${response.status})`);
-      err.status = response.status;
-      throw err;
-    }
-    return data;
-  }
-
-  function setAccount(data) {
-    account = data;
-    if (data?.name) {
-      els.accountName.textContent = data.name;
-      els.profileInfo.textContent = `${data.name} · ${Number(data.adsCount || 0).toLocaleString()} ads watched · ${Number(data.dailyAdsCount || 0)}/100 today`;
-    }
-    renderCount(Number(data?.adsCount || 0));
-    renderDailyCount(Number(data?.dailyAdsCount || 0));
-    els.status.textContent = "CONNECTED";
-    els.status.style.color = "var(--green)";
-    els.watch.disabled = Boolean(pendingAd) || adBusy || Number(data?.dailyAdsCount || 0) >= DAILY_LIMIT || Date.now() < cooldownUntil || Date.now() < breakUntil;
-    if (pendingAd) els.watch.innerHTML = '<span class="button-icon">⌛</span>Return to App';
-  }
-
-  function renderDailyCount(count) {
-    count = Math.max(0, Math.min(DAILY_LIMIT, Number(count) || 0));
-    els.dailyCount.textContent = count.toLocaleString();
-  }
-
-  function renderCount(count) {
-    count = Math.max(0, Number(count) || 0);
-    els.count.textContent = count.toLocaleString();
-    const remainder = count % BREAK_EVERY;
-    const pct = remainder / BREAK_EVERY * 100;
-    els.progressNum.textContent = `${remainder} / ${BREAK_EVERY}`;
-    els.bar.style.width = `${pct}%`;
-    if (count > 0 && remainder === 0) {
-      els.progressLabel.textContent = "Break earned";
-      els.bar.style.width = "100%";
-    } else {
-      els.progressLabel.textContent = "Progress to break";
-    }
-  }
-
-  function accountPopup(mode = "create") {
-    accountBusy = false;
-    els.accountError.textContent = "";
-    els.nameInput.value = "";
-    els.accountTitle.textContent = mode === "check" ? "Check Your Account" : "Enter Your Name";
-    els.accountText.textContent = mode === "check"
-      ? "Enter the same name you used previously to reconnect to your account."
-      : "Create your job account. Your ad count will be stored on the server.";
-    els.accountAction.textContent = mode === "check" ? "Check Account" : "Save";
-    els.accountAction.dataset.mode = mode;
-    showModal("accountModal");
-    setTimeout(() => els.nameInput.focus(), 120);
-  }
-
-  async function saveOrCheckAccount() {
-    if (accountBusy) return;
-    const name = els.nameInput.value.trim();
-    accountBusy = true;
-    els.accountAction.disabled = true;
-    els.accountError.textContent = "";
-    showModal("checkingModal");
-    hideModal("accountModal");
-    try {
-      let data;
-      const mode = els.accountAction.dataset.mode || "create";
-      if (mode === "check") {
-        data = await api("/api/account/check", { method: "POST", body: JSON.stringify({ name }) });
-      } else {
-        try {
-          data = await api("/api/account", { method: "POST", body: JSON.stringify({ name }) });
-        } catch (err) {
-          // If the name already exists, try to reconnect rather than strand the user.
-          if (err.status === 409) data = await api("/api/account/check", { method: "POST", body: JSON.stringify({ name }) });
-          else throw err;
-        }
-      }
-      if (data.sessionToken) setToken(data.sessionToken);
-      setAccount(data.account);
-      hideModal("checkingModal");
-      hideModal("accountModal");
-      toast("Account connected successfully");
-    } catch (err) {
-      hideModal("checkingModal");
-      showModal("accountModal");
-      els.accountError.textContent = err.message || "Could not connect account.";
-    } finally {
-      accountBusy = false;
-      els.accountAction.disabled = false;
-    }
-  }
-
-  async function loadSession() {
-    els.watch.disabled = true;
-    els.status.textContent = "CONNECTING";
-    try {
-      if (token()) {
-        const data = await api("/api/account/me");
-        setAccount(data.account);
-        if (pendingAd) finishMonetagAdOnReturn();
-        return;
-      }
-      const sess = await api("/api/session");
-      if (sess.hasSession) {
-        const me = await api("/api/account/me");
-        setAccount(me.account);
-        if (pendingAd) finishMonetagAdOnReturn();
-      } else {
-        els.status.textContent = "NOT CONNECTED";
-        els.accountName.textContent = "Not connected";
-        accountPopup("create");
-      }
-    } catch (err) {
-      if (err.status === 401) {
-        clearToken();
-        accountPopup("check");
-      } else {
-        els.status.textContent = "OFFLINE";
-        els.status.style.color = "var(--red)";
-        els.accountName.textContent = "Connection problem";
-        toast(err.message || "Backend connection failed");
-        // Give the user a way to enter/reconnect while API is unavailable.
-        accountPopup("check");
-      }
-    }
-  }
-
-  function setCooldown(ms) {
-    cooldownUntil = Date.now() + Math.max(0, ms);
-    if (cooldownTicker) clearInterval(cooldownTicker);
-    const updateCooldownButton = () => {
-      const now = Date.now();
-      const cooldownRemaining = Math.max(0, cooldownUntil - now);
-      const breakRemaining = Math.max(0, breakUntil - now);
-      if (cooldownRemaining > 0) {
-        els.watch.disabled = true;
-        els.watch.innerHTML = `<span class="button-icon">⌛</span>Cooldown ${Math.ceil(cooldownRemaining / 1000)}s`;
-      } else if (breakRemaining > 0) {
-        els.watch.disabled = true;
-        els.watch.innerHTML = `<span class="button-icon">⌛</span>Break ${Math.ceil(breakRemaining / 1000)}s`;
-      } else {
-        if (cooldownTicker) clearInterval(cooldownTicker);
-        cooldownTicker = null;
-        els.watch.disabled = !account || adBusy || Boolean(pendingAd);
-        els.watch.innerHTML = '<span class="button-icon">▶</span>Watch Ads';
-      }
-    };
-    updateCooldownButton();
-    cooldownTicker = setInterval(() => {
-      updateCooldownButton();
-    }, 250);
-  }
-
-  async function cancelAdSession(adToken) {
-    if (!adToken) return;
-    try {
-      await api('/api/account/me/cancel-ad', {
-        method: 'POST',
-        body: JSON.stringify({ adToken })
-      });
-    } catch {}
-  }
-
-  async function beginAd() {
-    if (pendingAd) {
-      toast('Please finish your previous ad attempt.');
-      return;
-    }
-    if (!account || adBusy) {
-      if (!account) accountPopup('check');
-      return;
-    }
-    const daily = Number(account.dailyAdsCount || 0);
-    if (daily >= DAILY_LIMIT) {
-      showResult(false, 'Daily Limit Reached', 'You have reached today’s 100-ad limit. Come back tomorrow.');
-      return;
-    }
-    if (Date.now() < breakUntil) {
-      toast(`Break time: ${Math.ceil((breakUntil - Date.now()) / 1000)} seconds left`);
-      return;
-    }
-    if (Date.now() < cooldownUntil) {
-      toast(`Please wait ${Math.ceil((cooldownUntil - Date.now()) / 1000)} seconds`);
-      return;
-    }
-
-    adBusy = true;
-    els.watch.disabled = true;
-    els.watch.innerHTML = '<span class="button-icon">⌛</span>Loading Monetag Ad...';
-
-    let adToken = '';
-    try {
-      const start = await api('/api/account/me/start-ad', { method: 'POST', body: '{}' });
-      adToken = start.adToken;
-      pendingAd = { adToken, startedAt: Date.now(), leftApp: false };
-      storage.set('adtracker_pending_ad', JSON.stringify(pendingAd));
-
-      if (typeof window.show_12333273 !== 'function') {
-        throw new Error('Monetag ad is not ready. Please try again.');
-      }
-
-      // Monetag rewarded video/interstitial is opened from the user's click.
-      const adResult = window.show_12333273();
-      if (adResult && typeof adResult.then === 'function') {
-        await adResult;
-      }
-
-      // Keep the session pending. Visibility/focus/pageshow will also call this.
-      pendingAd.leftApp = true;
-      storage.set('adtracker_pending_ad', JSON.stringify(pendingAd));
-      toast('Return to the app after watching the ad.');
-      await finishMonetagAdOnReturn();
-    } catch (err) {
-      await cancelAdSession(adToken);
-      pendingAd = null;
-      storage.remove('adtracker_pending_ad');
-      showResult(false, 'Ad Not Counted', err.message || 'Monetag ad could not be opened.');
-      adBusy = false;
-      els.watch.disabled = !account;
-      els.watch.innerHTML = '<span class="button-icon">▶</span>Watch Ads';
-    }
-  }
-
-  async function finishMonetagAdOnReturn() {
-    if (!pendingAd || !account || !pendingAd.leftApp) return;
-    const elapsed = Date.now() - Number(pendingAd.startedAt || 0);
-    const adToken = pendingAd.adToken;
-    adBusy = true;
-    els.watch.disabled = true;
-    try {
-      if (elapsed < MIN_WATCH_MS) {
-        await cancelAdSession(adToken);
-        pendingAd = null;
-        storage.remove('adtracker_pending_ad');
-        showResult(false, 'Count Not Updated', 'You closed the ad before 10 seconds. Count not updated. Watch Ads minimum 10 seconds.');
-        setCooldown(COOLDOWN_MS);
-        return;
-      }
-      const result = await api('/api/account/me/increment-ad', {
-        method: 'POST',
-        body: JSON.stringify({ adToken })
-      });
-      pendingAd = null;
-      storage.remove('adtracker_pending_ad');
-      setAccount(result.account);
-      const ads = Number(result.account.adsCount || 0);
-      const dailyAds = Number(result.account.dailyAdsCount || 0);
-      if (dailyAds % BREAK_EVERY === 0) {
-        breakUntil = Date.now() + BREAK_MS;
-        showResult(true, 'Ad Count Updated', `You reached ${dailyAds}/100 daily ads. Take a 5-minute break.`);
-      } else {
-        showResult(true, 'Ad Count Updated', 'Count Updated. Your ad was watched for the minimum required time.');
-      }
-      setCooldown(COOLDOWN_MS);
-    } catch (err) {
-      await cancelAdSession(adToken);
-      pendingAd = null;
-      storage.remove('adtracker_pending_ad');
-      showResult(false, 'Ad Not Counted', err.message || 'Ad visit could not be verified. Please try again.');
-      setCooldown(COOLDOWN_MS);
-    } finally {
-      adBusy = false;
-      if (!cooldownTicker) {
-        els.watch.disabled = !account || adBusy || Boolean(pendingAd) || Date.now() < breakUntil;
-        els.watch.innerHTML = '<span class="button-icon">▶</span>Watch Ads';
-      }
-    }
-  }
-
-  function restorePendingAd() {
-    // Keep the server-issued token to finish after returning from the Monetag ad.
-    try {
-      const raw = storage.get('adtracker_pending_ad');
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (saved?.adToken && Number(saved.startedAt) > 0) pendingAd = saved;
-      }
-    } catch { pendingAd = null; }
-  }
-
-  function showResult(success, title, message) {
-    els.resultIcon.textContent = success ? "✓" : "!";
-    els.resultIcon.className = `modal-icon ${success ? "success" : "failure"}`;
-    els.resultTitle.textContent = title;
-    els.resultText.textContent = message;
-    showModal("resultModal");
-  }
-
-  async function openAdmin() {
-    hideModal("profileModal");
-    els.adminError.textContent = "";
-    showModal("adminLoginModal");
-    setTimeout(() => els.adminPassword.focus(), 100);
-  }
-
-  async function adminAuth() {
-    if (adminBusy) return;
-    const password = els.adminPassword.value;
-    if (!password) {
-      els.adminError.textContent = "Enter the admin password.";
-      return;
-    }
-    adminBusy = true;
-    els.adminLogin.disabled = true;
-    els.adminError.textContent = "";
-    try {
-      const data = await api("/api/admin/login", { method: "POST", body: JSON.stringify({ password }) });
-      adminToken = data.adminToken;
-      els.adminPassword.value = "";
-      hideModal("adminLoginModal");
-      showModal("adminModal");
-      await loadAdminUsers();
-    } catch (err) {
-      els.adminError.textContent = err.message || "Admin login failed";
-    } finally {
-      adminBusy = false;
-      els.adminLogin.disabled = false;
-    }
-  }
-
-  async function loadAdminUsers() {
-    els.adminSummary.textContent = "Loading users...";
-    els.adminList.replaceChildren();
-    try {
-      const data = await api("/api/admin/users");
-      const users = data.users || [];
-      const totalAds = users.reduce((sum, user) => sum + Number(user.adsCount || 0), 0);
-      els.adminSummary.textContent = `${users.length} active users · ${totalAds.toLocaleString()} total ads`;
-      if (!users.length) {
-        els.adminList.textContent = "No accounts yet.";
-        return;
-      }
-      users.forEach((user) => {
-        const row = document.createElement("div");
-        row.className = "user-row";
-        const info = document.createElement("div");
-        info.className = "user-info";
-        const name = document.createElement("div");
-        name.className = "user-name";
-        name.textContent = user.name;
-        const ads = document.createElement("div");
-        ads.className = "user-ads";
-        ads.textContent = `${Number(user.adsCount || 0).toLocaleString()} total · ${Number(user.dailyAdsCount || 0)}/100 today · Account #${user.id}`;
-        info.append(name, ads);
-        const reset = document.createElement("button");
-        reset.className = "reset";
-        reset.textContent = "Reset";
-        reset.addEventListener("click", async () => {
-          if (!confirm(`Reset ad count for ${user.name} to 0?`)) return;
-          reset.disabled = true;
-          try {
-            await api(`/api/admin/users/${encodeURIComponent(user.id)}/reset`, { method: "POST", body: "{}" });
-            toast(`${user.name}'s ad count reset`);
-            await loadAdminUsers();
-          } catch (err) {
-            toast(err.message || "Reset failed");
-            reset.disabled = false;
-          }
-        });
-        row.append(info, reset);
-        els.adminList.append(row);
-      });
-    } catch (err) {
-      els.adminSummary.textContent = err.message || "Could not load users.";
-    }
-  }
-
-  // Wire every control after the DOM is available (script is deferred).
-  els.accountAction.addEventListener("click", saveOrCheckAccount);
-  els.nameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") saveOrCheckAccount(); });
-  els.profileBtn.addEventListener("click", () => {
-    if (!account) return accountPopup("check");
-    els.profileInfo.textContent = `${account.name} · ${Number(account.adsCount || 0).toLocaleString()} ads watched · ${Number(account.dailyAdsCount || 0)}/100 today`;
-    showModal("profileModal");
-  });
-  els.profileClose.addEventListener("click", () => hideModal("profileModal"));
-  els.adminOpen.addEventListener("click", openAdmin);
-  els.logoutBtn.addEventListener("click", async () => {
-    try { await api("/api/logout", { method: "POST", body: "{}" }); } catch {}
-    clearToken();
-    account = null;
-    pendingAd = null;
-    storage.remove("adtracker_pending_ad");
-    hideModal("profileModal");
-    els.status.textContent = "NOT CONNECTED";
-    els.accountName.textContent = "Not connected";
-    els.watch.disabled = true;
-    accountPopup("check");
-  });
-  els.adminLogin.addEventListener("click", adminAuth);
-  els.adminPassword.addEventListener("keydown", (e) => { if (e.key === "Enter") adminAuth(); });
-  els.adminLoginClose.addEventListener("click", () => hideModal("adminLoginModal"));
-  els.adminRefresh.addEventListener("click", loadAdminUsers);
-  els.adminClose.addEventListener("click", () => hideModal("adminModal"));
-  els.watch.addEventListener("click", beginAd);
-  els.resultClose.addEventListener("click", () => hideModal("resultModal"));
-
-  // Outside-click closes only the modal that was tapped, not nested actions.
-  ["accountModal", "profileModal", "adminLoginModal", "adminModal", "resultModal"].forEach(id => {
-    $(id).addEventListener("click", (event) => {
-      if (event.target === $(id) && id !== "accountModal") hideModal(id);
-    });
-  });
-
-  // Detect return from the Monetag ad across tab focus, app visibility, and page restore.
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && pendingAd) finishMonetagAdOnReturn();
-  });
-  window.addEventListener('focus', () => {
-    if (pendingAd) finishMonetagAdOnReturn();
-  });
-  window.addEventListener('pageshow', () => {
-    if (pendingAd) finishMonetagAdOnReturn();
-  });
-
-  restorePendingAd();
-  loadSession();
+  storage.set("babydoge_session_token",d.sessionToken||"");
+  setAccount(d.account);
+  hide("checkingModal");
+  toast("Account connected successfully");
+ }catch(e){
+  hide("checkingModal");
+  show("accountModal");
+  $("accountError").textContent=e.message||"Could not connect account.";
+ }finally{
+  accountBusy=false;
+  $("accountAction").disabled=false;
+ }
+}
+async function loadSession(){
+ try{if(storage.get("babydoge_session_token")){const d=await api("/api/account/me");setAccount(d.account);if(pendingAd)await finishAd();return}
+ const s=await api("/api/session");if(s.hasSession){const d=await api("/api/account/me");setAccount(d.account);if(pendingAd)await finishAd()}else{accountPopup("create")}
+ }catch(e){$("status").textContent="OFFLINE";$("status").style.color="var(--danger)";if(e.status===401){storage.remove("babydoge_session_token");accountPopup("check")}else{toast(e.message||"Backend connection failed");accountPopup("check")}}
+}
+async function beginAd(){
+ if(pendingAd){await finishAd();return} if(!account)return accountPopup("check");
+ const daily=Number(account.dailyAdsCount||0);if(daily>=DAILY_LIMIT){showResult(false,"Daily Limit Reached","You have reached today's 100-ad limit. Come back tomorrow.");return}
+ if(Date.now()<cooldownUntil||Date.now()<breakUntil)return;
+ adBusy=true;updateAdButton();let adToken="";
+ try{
+  const s=await api("/api/account/me/start-ad",{method:"POST",body:"{}"});adToken=s.adToken;
+  pendingAd={adToken,startedAt:Date.now(),leftApp:true};storage.set("babydoge_pending_ad",JSON.stringify(pendingAd));
+  toast("Watch the ad for at least 8 seconds, then return to the app.");
+  window.location.href=ADS_URL;
+ }catch(e){pendingAd=null;storage.remove("babydoge_pending_ad");showResult(false,"Ad Not Opened",e.message||"Could not open ad.");adBusy=false;updateAdButton()}
+}
+async function finishAd(){
+ if(finishingAd||!pendingAd||!account||!pendingAd.leftApp)return;
+ finishingAd=true;
+ const elapsed=Date.now()-Number(pendingAd.startedAt||0),adToken=pendingAd.adToken;adBusy=true;updateAdButton();
+ try{
+  if(elapsed<MIN_WATCH_MS){await api("/api/account/me/cancel-ad",{method:"POST",body:JSON.stringify({adToken})});pendingAd=null;storage.remove("babydoge_pending_ad");showResult(false,"Count Not Updated","Watch Ads minimum 8 seconds. Ticket not added.");setCooldown(COOLDOWN_MS);return}
+  const d=await api("/api/account/me/increment-ad",{method:"POST",body:JSON.stringify({adToken})});pendingAd=null;storage.remove("babydoge_pending_ad");setAccount(d.account);
+  if(Number(d.account.dailyAdsCount)%BREAK_EVERY===0){breakUntil=Date.now()+BREAK_MS;showResult(true,"1 Ticket Added","1 ticket added to your balance. A 5-minute break is now active.")}else showResult(true,"1 Ticket Added","1 ticket added to your balance.");
+  setCooldown(COOLDOWN_MS);
+ }catch(e){pendingAd=null;storage.remove("babydoge_pending_ad");showResult(false,"Ticket Not Added",e.message||"Ad could not be verified.");setCooldown(COOLDOWN_MS)}
+ finally{adBusy=false;finishingAd=false;updateAdButton()}
+}
+async function unlockOffer(){
+ if(!account)return;
+ if(offerUnlocked){
+  try{const d=await api("/api/account/me/super-offer/claim",{method:"POST",body:"{}"});setAccount(d.account);offerUnlocked=false;showResult(true,"Coin Claimed","+7,500,000 BabyDoge coin added to your balance.");}
+  catch(e){toast(e.message||"Could not claim coin.");renderAll()}
+  return;
+ }
+ if(Number(account.ticketBalance||0)<OFFER_COST){showResult(false,"Not Enough Tickets","You need 30 tickets to unlock this Super Offer.");return}
+ $("unlockOfferBtn").disabled=true;
+ try{const d=await api("/api/account/me/super-offer/unlock",{method:"POST",body:"{}"});setAccount(d.account);offerUnlocked=true;showResult(true,"Super Offer Unlocked","30 tickets were deducted. Your Claim Coin button is ready.");}
+ catch(e){toast(e.message||"Could not unlock offer.");renderAll()}
+}
+async function openAdmin(){hide("profileModal");$("adminError").textContent="";show("adminLoginModal");setTimeout(()=>$("adminPassword").focus(),80)}
+async function adminAuth(){if(adminBusy)return;const p=$("adminPassword").value;if(!p){$("adminError").textContent="Enter password.";return}adminBusy=true;try{const d=await api("/api/admin/login",{method:"POST",body:JSON.stringify({password:p})});adminToken=d.adminToken;$("adminPassword").value="";hide("adminLoginModal");show("adminModal");await loadAdmin()}catch(e){$("adminError").textContent=e.message||"Admin login failed"}finally{adminBusy=false}}
+async function loadAdmin(){
+ $("adminSummary").textContent="Loading users...";$("adminList").replaceChildren();
+ try{const d=await api("/api/admin/users");const users=d.users||[];$("adminSummary").textContent=`${users.length} users · Ads, Super Offers and Referrals only`;
+ users.forEach(u=>{const row=document.createElement("div");row.className="user-row";row.innerHTML=`<div class="user-name">${escapeHtml(u.name)}</div><div class="user-detail">Ads watched: <b>${Number(u.adsCount||0).toLocaleString()}</b><br>Super Offers completed: <b>${Number(u.superOffersCompleted||0).toLocaleString()}</b><br>Referrals: <b>${Number(u.referralsCount||0).toLocaleString()}</b></div>`;$("adminList").append(row)})}
+ catch(e){$("adminSummary").textContent=e.message||"Could not load users."}
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+$("accountAction").onclick=saveOrCheck;$("nameInput").onkeydown=e=>{if(e.key==="Enter")saveOrCheck()};
+$("offerOpen").onclick=()=>switchPage("offerPage");$("ticketOpen").onclick=()=>switchPage("ticketPage");document.querySelectorAll("[data-back]").forEach(b=>b.onclick=()=>switchPage("homePage"));
+$("watchTicketBtn").onclick=beginAd;$("unlockOfferBtn").onclick=unlockOffer;
+$("withdrawBtn").onclick=()=>toast("Withdrawal button is ready for your existing withdrawal flow.");
+$("profileBtn").onclick=()=>{if(!account)return accountPopup("check");$("profileInfo").textContent=`${account.name} · ${Number(account.adsCount||0).toLocaleString()} ads · ${Number(account.referralsCount||0).toLocaleString()} referrals`;show("profileModal")};
+$("profileClose").onclick=()=>hide("profileModal");$("adminOpen").onclick=openAdmin;$("adminLogin").onclick=adminAuth;$("adminPassword").onkeydown=e=>{if(e.key==="Enter")adminAuth()};$("adminLoginClose").onclick=()=>hide("adminLoginModal");$("adminRefresh").onclick=loadAdmin;$("adminClose").onclick=()=>hide("adminModal");$("resultClose").onclick=()=>hide("resultModal");
+$("logoutBtn").onclick=async()=>{try{await api("/api/logout",{method:"POST",body:"{}"})}catch{}storage.remove("babydoge_session_token");storage.remove("babydoge_pending_ad");account=null;hide("profileModal");accountPopup("check")};
+["profileModal","adminLoginModal","adminModal","resultModal"].forEach(id=>$(id).onclick=e=>{if(e.target===$(id))hide(id)});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&pendingAd)finishAd()});window.addEventListener("focus",()=>{if(pendingAd)finishAd()});window.addEventListener("pageshow",()=>{if(pendingAd)finishAd()});
+try{pendingAd=JSON.parse(storage.get("babydoge_pending_ad")||"null")}catch{pendingAd=null}
+loadSession();
 })();
 </script>
 </body>
