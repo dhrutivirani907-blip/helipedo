@@ -82,8 +82,11 @@ const adminLimiter = rateLimit({
 app.use("/api/", generalLimiter);
 
 const COOKIE_NAME = "job_account_session";
-const MIN_AD_WATCH_MS = 12000;
-const AD_COOLDOWN_MS = 5000;
+const MIN_AD_WATCH_MS = 10000;
+const AD_COOLDOWN_MS = 30000;
+const DAILY_AD_LIMIT = 100;
+const BREAK_EVERY = 10;
+const BREAK_MS = 5 * 60 * 1000;
 const MAX_AD_SESSION_MS = 60 * 60 * 1000;
 // One active, one-use ad session per account. Tokens expire after one hour.
 const activeAdSessions = new Map();
@@ -144,13 +147,37 @@ function getAccountId(req) {
     verifyToken(req.cookies?.[COOKIE_NAME]);
 }
 
+async function getDailyState(accountId) {
+  const result = await pool.query(
+    `SELECT ads_count, daily_ads_count, daily_ads_date,
+            ((NOW() AT TIME ZONE 'Asia/Kolkata')::date) AS today
+     FROM job_accounts WHERE id = $1 AND is_active = TRUE`,
+    [accountId]
+  );
+  if (!result.rows[0]) return null;
+  const row = result.rows[0];
+  if (String(row.daily_ads_date) !== String(row.today)) {
+    const reset = await pool.query(
+      `UPDATE job_accounts
+       SET daily_ads_count = 0,
+           daily_ads_date = ((NOW() AT TIME ZONE 'Asia/Kolkata')::date),
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING ads_count, daily_ads_count, daily_ads_date`,
+      [accountId]
+    );
+    return reset.rows[0] || null;
+  }
+  return row;
+}
+
 async function requireAccount(req, res, next) {
   const accountId = getAccountId(req);
   if (!accountId) return res.status(401).json({ ok: false, error: "Account session expired. Please enter your name again." });
 
   try {
     const result = await pool.query(
-      "SELECT id, name, ads_count FROM job_accounts WHERE id = $1 AND is_active = TRUE",
+      "SELECT id, name, ads_count, daily_ads_count, daily_ads_date FROM job_accounts WHERE id = $1 AND is_active = TRUE",
       [accountId]
     );
     if (!result.rows[0]) {
@@ -158,6 +185,12 @@ async function requireAccount(req, res, next) {
       return res.status(401).json({ ok: false, error: "Account not found." });
     }
     req.account = result.rows[0];
+    const state = await getDailyState(accountId);
+    if (state) {
+      req.account.ads_count = state.ads_count;
+      req.account.daily_ads_count = state.daily_ads_count;
+      req.account.daily_ads_date = state.daily_ads_date;
+    }
     next();
   } catch (err) {
     console.error(err);
@@ -187,6 +220,8 @@ async function initDb() {
       name VARCHAR(40) NOT NULL,
       name_key VARCHAR(40) NOT NULL UNIQUE,
       ads_count BIGINT NOT NULL DEFAULT 0 CHECK (ads_count >= 0),
+      daily_ads_count INTEGER NOT NULL DEFAULT 0 CHECK (daily_ads_count >= 0),
+      daily_ads_date DATE NOT NULL DEFAULT ((NOW() AT TIME ZONE 'Asia/Kolkata')::date),
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -195,6 +230,8 @@ async function initDb() {
   `);
 
   await pool.query(`ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS last_ad_attempt_at TIMESTAMPTZ;`);
+  await pool.query(`ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS daily_ads_count INTEGER NOT NULL DEFAULT 0;`);
+  await pool.query(`ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS daily_ads_date DATE NOT NULL DEFAULT ((NOW() AT TIME ZONE 'Asia/Kolkata')::date);`);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS job_accounts_created_idx
@@ -228,7 +265,7 @@ app.get("/api/session", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "SELECT id, name, ads_count FROM job_accounts WHERE id = $1 AND is_active = TRUE",
+      "SELECT id, name, ads_count, daily_ads_count, daily_ads_date FROM job_accounts WHERE id = $1 AND is_active = TRUE",
       [accountId]
     );
     if (!result.rows[0]) {
@@ -269,7 +306,7 @@ app.post("/api/account", async (req, res) => {
     const created = await pool.query(
       `INSERT INTO job_accounts (name, name_key)
        VALUES ($1, $2)
-       RETURNING id, name, ads_count`,
+       RETURNING id, name, ads_count, daily_ads_count, daily_ads_date`,
       [name, nameKey]
     );
 
@@ -283,7 +320,8 @@ app.post("/api/account", async (req, res) => {
       account: {
         id: account.id,
         name: account.name,
-        adsCount: Number(account.ads_count)
+        adsCount: Number(account.ads_count),
+        dailyAdsCount: Number(account.daily_ads_count || 0)
       }
     });
   } catch (err) {
@@ -306,7 +344,7 @@ app.post("/api/account/check", async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, name, ads_count
+      `SELECT id, name, ads_count, daily_ads_count, daily_ads_date
        FROM job_accounts
        WHERE name_key = $1 AND is_active = TRUE`,
       [nameKey]
@@ -329,7 +367,8 @@ app.post("/api/account/check", async (req, res) => {
       account: {
         id: account.id,
         name: account.name,
-        adsCount: Number(account.ads_count)
+        adsCount: Number(account.ads_count),
+        dailyAdsCount: Number(account.daily_ads_count || 0)
       }
     });
   } catch (err) {
@@ -344,7 +383,8 @@ app.get("/api/account/me", requireAccount, (req, res) => {
     account: {
       id: req.account.id,
       name: req.account.name,
-      adsCount: Number(req.account.ads_count)
+      adsCount: Number(req.account.ads_count),
+      dailyAdsCount: Number(req.account.daily_ads_count || 0)
     }
   });
 });
@@ -354,10 +394,32 @@ app.post("/api/account/me/start-ad", requireAccount, async (req, res) => {
   const now = Date.now();
   try {
     const check = await pool.query(
-      `SELECT last_ad_attempt_at FROM job_accounts WHERE id = $1 AND is_active = TRUE`,
+      `SELECT last_ad_attempt_at, daily_ads_count, daily_ads_date,
+              ((NOW() AT TIME ZONE 'Asia/Kolkata')::date) AS today
+       FROM job_accounts WHERE id = $1 AND is_active = TRUE`,
       [req.account.id]
     );
+    if (!check.rows[0]) return res.status(404).json({ ok: false, error: "Account not found." });
+    let dailyCount = Number(check.rows[0].daily_ads_count || 0);
+    if (String(check.rows[0].daily_ads_date) !== String(check.rows[0].today)) {
+      dailyCount = 0;
+      await pool.query(
+        `UPDATE job_accounts SET daily_ads_count = 0,
+         daily_ads_date = ((NOW() AT TIME ZONE 'Asia/Kolkata')::date),
+         updated_at = NOW() WHERE id = $1`,
+        [req.account.id]
+      );
+    }
+    if (dailyCount >= DAILY_AD_LIMIT) {
+      return res.status(429).json({ ok: false, error: "Daily ad limit reached. Maximum 100 ads per day." });
+    }
     const last = check.rows[0]?.last_ad_attempt_at ? new Date(check.rows[0].last_ad_attempt_at).getTime() : 0;
+    if (dailyCount > 0 && dailyCount % BREAK_EVERY === 0) {
+      const breakRemaining = Math.max(0, BREAK_MS - (now - last));
+      if (breakRemaining > 0) {
+        return res.status(429).json({ ok: false, error: `5-minute break active. Wait ${Math.ceil(breakRemaining / 1000)} seconds.` });
+      }
+    }
     const remaining = Math.max(0, AD_COOLDOWN_MS - (now - last));
     if (remaining > 0) {
       return res.status(429).json({ ok: false, error: `Cooldown active. Wait ${Math.ceil(remaining / 1000)} seconds.` });
@@ -405,7 +467,7 @@ app.post("/api/account/me/increment-ad", requireAccount, async (req, res) => {
     return res.status(400).json({ ok: false, error: "Ad session is invalid or already used. Please open the ad again." });
   }
   if (Date.now() - session.startedAt < MIN_AD_WATCH_MS) {
-    return res.status(400).json({ ok: false, error: "Minimum ad watch time is 12 seconds." });
+    return res.status(400).json({ ok: false, error: "Minimum ad watch time is 10 seconds." });
   }
   if (Date.now() - session.startedAt > MAX_AD_SESSION_MS) {
     activeAdSessions.delete(key);
@@ -419,20 +481,28 @@ app.post("/api/account/me/increment-ad", requireAccount, async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE job_accounts
-       SET ads_count = ads_count + 1, last_ad_attempt_at = NOW(), updated_at = NOW()
-       WHERE id = $1 AND is_active = TRUE
-       RETURNING id, name, ads_count`,
-      [req.account.id]
+       SET ads_count = ads_count + 1,
+           daily_ads_count = daily_ads_count + 1,
+           daily_ads_date = ((NOW() AT TIME ZONE 'Asia/Kolkata')::date),
+           last_ad_attempt_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1
+         AND is_active = TRUE
+         AND daily_ads_count < $2
+         AND daily_ads_date = ((NOW() AT TIME ZONE 'Asia/Kolkata')::date)
+       RETURNING id, name, ads_count, daily_ads_count, daily_ads_date`,
+      [req.account.id, DAILY_AD_LIMIT]
     );
 
     const account = result.rows[0];
-    if (!account) return res.status(404).json({ ok: false, error: "Account not found." });
+    if (!account) return res.status(429).json({ ok: false, error: "Daily ad limit reached. Maximum 100 ads per day." });
     res.json({
       ok: true,
       account: {
         id: account.id,
         name: account.name,
-        adsCount: Number(account.ads_count)
+        adsCount: Number(account.ads_count),
+        dailyAdsCount: Number(account.daily_ads_count || 0)
       }
     });
   } catch (err) {
@@ -465,7 +535,7 @@ app.post("/api/admin/login", adminLimiter, (req, res) => {
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT id, name, ads_count, created_at, updated_at
+      SELECT id, name, ads_count, daily_ads_count, daily_ads_date, created_at, updated_at
       FROM job_accounts
       WHERE is_active = TRUE
       ORDER BY created_at DESC
@@ -477,6 +547,7 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
         id: row.id,
         name: row.name,
         adsCount: Number(row.ads_count),
+        dailyAdsCount: Number(row.daily_ads_count || 0),
         createdAt: row.created_at,
         updatedAt: row.updated_at
       }))
@@ -496,9 +567,9 @@ app.post("/api/admin/users/:id/reset", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE job_accounts
-       SET ads_count = 0, updated_at = NOW()
+       SET ads_count = 0, daily_ads_count = 0, daily_ads_date = ((NOW() AT TIME ZONE 'Asia/Kolkata')::date), updated_at = NOW()
        WHERE id = $1 AND is_active = TRUE
-       RETURNING id, name, ads_count`,
+       RETURNING id, name, ads_count, daily_ads_count, daily_ads_date`,
       [id]
     );
 
@@ -512,7 +583,8 @@ app.post("/api/admin/users/:id/reset", requireAdmin, async (req, res) => {
       account: {
         id: result.rows[0].id,
         name: result.rows[0].name,
-        adsCount: Number(result.rows[0].ads_count)
+        adsCount: Number(result.rows[0].ads_count),
+        dailyAdsCount: Number(result.rows[0].daily_ads_count || 0)
       }
     });
   } catch (err) {
