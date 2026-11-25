@@ -49,7 +49,7 @@ h1{font-size:30px;letter-spacing:-.06em;margin:0 0 5px}.sub{font-size:12px;color
 .profile-menu{display:grid;gap:8px}.menu-btn{border:1px solid #e1e1df;background:#fafafa;border-radius:13px;padding:13px;text-align:left;font-weight:850}.menu-btn.admin{background:#111;color:#fff}.admin-list{max-height:55vh;overflow:auto}
 .admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.stat{padding:12px;border-radius:14px;background:#f6f6f4;border:1px solid #e2e2df}.stat b{font-size:18px}.stat span{display:block;font-size:8px;color:#777;margin-top:3px}
 .modal-bg{position:fixed;inset:0;background:#0009;backdrop-filter:blur(9px);display:none;align-items:center;justify-content:center;padding:18px;z-index:50}.modal-bg.show{display:flex}.modal{width:min(100%,400px);max-height:88vh;overflow:auto;background:#fff;border-radius:24px;padding:21px;box-shadow:0 30px 100px #0008}.modal h3{margin:0 0 7px;font-size:19px}.modal p{font-size:10px;color:#777;line-height:1.5}.modal-icon{width:54px;height:54px;border-radius:16px;background:#111;display:grid;place-items:center;overflow:hidden;font-size:23px;margin-bottom:12px}.modal-icon img{width:100%;height:100%;object-fit:cover}
-.ad-modal{text-align:center;border:1px solid #f0d477;background:linear-gradient(155deg,#fff 0%,#fffaf0 100%)}.ad-modal .modal-icon{margin:0 auto 12px;background:linear-gradient(135deg,#ffd95a,#d89d18);color:#171717}.ad-modal h3{font-size:21px;line-height:1.25}.ad-modal .note{margin-top:14px;color:#72540b;background:#fff7db;border-color:#f0dfaa}.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:80;background:#111;color:#fff;border:1px solid #333;border-radius:13px;padding:11px 15px;font-size:10px;transition:.2s;max-width:90vw;text-align:center}
+.ad-modal{text-align:center;border:1px solid #f0d477;background:linear-gradient(155deg,#fff 0%,#fffaf0 100%)}.ad-modal .modal-icon{margin:0 auto 12px;background:linear-gradient(135deg,#ffd95a,#d89d18);color:#171717}.ad-modal h3{font-size:21px;line-height:1.25}.ad-modal .note{margin-top:14px;color:#72540b;background:#fff7db;border-color:#f0dfaa}.ad-minimum-text{margin:10px 0 0;color:#8a6a18;font-size:10px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:80;background:#111;color:#fff;border:1px solid #333;border-radius:13px;padding:11px 15px;font-size:10px;transition:.2s;max-width:90vw;text-align:center}
 .admin-actions{display:flex;gap:7px;flex-wrap:wrap}.admin-actions button{flex:1;min-width:80px}.mini-input{padding:9px;border:1px solid #ddd;border-radius:10px;width:100%;font-size:10px}
 @media(max-width:370px){.balance-number{font-size:27px}.tap-coin{width:132px;height:132px}}
 </style>
@@ -136,13 +136,14 @@ h1{font-size:30px;letter-spacing:-.06em;margin:0 0 5px}.sub{font-size:12px;color
 </main>
 
 <div class="modal-bg" id="tapAdModal" aria-hidden="true">
- <div class="modal">
+ <div class="modal ad-modal">
   <div class="modal-icon">📺</div>
   <h3 id="tapAdTitle">Watch ads and reset your progress bar</h3>
-  <p id="tapAdMessage">Watch the ad for at least 10 seconds, then return to the app.</p>
+  <p id="tapAdMessage">Watch the ad, then return to the app to reset your progress bar.</p>
   <p id="tapAdStatus" style="font-weight:800;color:#9b7412">Your 4/4 progress is waiting.</p>
   <button class="gold-btn" id="watchDirectAdBtn" type="button">Watch Ads</button>
-  <button class="black-btn" id="tapAdCloseBtn" type="button" style="margin-top:10px">Close</button>
+  <div class="ad-minimum-text">Watch ads minimum 8 second</div>
+  <button class="black-btn" id="tapAdCloseBtn" type="button" style="margin-top:12px">Close</button>
  </div>
 </div>
 
@@ -243,7 +244,7 @@ $("profileBtn").onclick=()=>{if(!account)return showModal("nameModal");renderAcc
 
 function openTapAdModal(){
  $("tapAdTitle").textContent="Watch ads and reset your progress bar";
- $("tapAdMessage").textContent="Watch ads for a minimum of 10 seconds. Return to the app after 10 seconds to complete the reset.";
+ $("tapAdMessage").textContent="Watch ads and reset your progress bar. Return to the app after watching for at least 10 seconds.";
  $("tapAdStatus").textContent="Your 4/4 progress is waiting.";
  $("watchDirectAdBtn").disabled=false;$("watchDirectAdBtn").textContent="Watch Ads";$("watchDirectAdBtn").style.display="block";
  adCompleted=false;showModal("tapAdModal");
@@ -255,33 +256,37 @@ async function startDirectAd(){
  let openedTab=null;
  let linkOpened=false;
 
- // Save the start time immediately, before leaving this app.
- adStartedAt=Date.now();
- localStorage.setItem("pending_tap_ad_token",activeAdToken);
- localStorage.setItem("pending_tap_ad_started_at",String(adStartedAt));
- localStorage.setItem("pending_tap_ad_left_app","0");
- sessionStorage.setItem("pending_tap_ad_started_at",String(adStartedAt));
+ // Open a blank tab synchronously for normal browsers so popup blockers do not block it.
+ if(!tg){
+  try{openedTab=window.open("about:blank","_blank");}catch(_){}
+ }
  btn.disabled=true;btn.textContent="Opening ad…";
- $("tapAdMessage").textContent="Ad opened. Stay on the ad for at least 10 seconds, then return to this app.";
- $("tapAdStatus").textContent="Waiting for you to return…";
+ $("tapAdMessage").textContent="Opening your ad. Please watch it for at least 10 seconds. Your progress will stay saved until the watch requirement is completed.";
+ $("tapAdStatus").textContent="Preparing ad session…";
 
- // Open synchronously during the click so the browser does not block it.
  try{
+  // Start the timer on the server before opening the ad. The server timestamp is
+  // also saved locally, so the app and backend use the same 10-second start time.
+  const started=await api("/api/tap/ad-start",{method:"POST",body:JSON.stringify({adToken:activeAdToken})});
+  adStartedAt=Number(started.startedAt)||Date.now();
+  localStorage.setItem("pending_tap_ad_token",activeAdToken);
+  localStorage.setItem("pending_tap_ad_started_at",String(adStartedAt));
+  localStorage.setItem("pending_tap_ad_left_app","0");
+  sessionStorage.setItem("pending_tap_ad_started_at",String(adStartedAt));
+
   if(tg && typeof tg.openLink==="function"){
    tg.openLink(adUrl,{try_instant_view:false});
    linkOpened=true;
+  }else if(openedTab){
+   openedTab.opener=null;
+   openedTab.location.href=adUrl;
+   linkOpened=true;
   }else{
-   openedTab=window.open("about:blank","_blank");
-   if(openedTab){openedTab.opener=null;openedTab.location.href=adUrl;linkOpened=true;}
-   else{window.location.href=adUrl;linkOpened=true;}
+   // Last-resort same-tab navigation when the browser blocks a new tab.
+   window.location.href=adUrl;
+   linkOpened=true;
   }
- }catch(openError){
-  try{if(openedTab&&!openedTab.closed)openedTab.location.href=adUrl;else window.location.href=adUrl;linkOpened=true;}catch(_){}
- }
-
- try{
-  await api("/api/tap/ad-start",{method:"POST",body:JSON.stringify({adToken:activeAdToken})});
-  if(!linkOpened)throw new Error("Could not open the ad link. Please allow external links and try again.");
+  $("tapAdStatus").textContent="Waiting for you to return…";
  }catch(e){
   if(openedTab&&!openedTab.closed){try{openedTab.close()}catch(_){}}
   adStartedAt=0;
@@ -289,16 +294,17 @@ async function startDirectAd(){
   localStorage.setItem("pending_tap_ad_left_app","0");
   sessionStorage.removeItem("pending_tap_ad_started_at");
   btn.disabled=false;btn.textContent="Watch Ads";
-  toast(e.message||"Could not start the ad. Please try again.");
+  toast(e.message||"Could not open the ad. Please try again.");
  }
 }
+
 async function handleAdReturn(){
  if(adCompleted||!adStartedAt||adReturnProcessing||!activeAdToken)return;
  adReturnProcessing=true;
  const elapsed=Date.now()-adStartedAt;
  if(elapsed<10000){
   $("tapAdTitle").textContent="Watch ads minimum 10 seconds";
-  $("tapAdMessage").textContent="You returned before 10 seconds. Watch the ad for at least 10 seconds, then come back. Your progress bar has NOT been reset.";
+  $("tapAdMessage").textContent="You returned before 10 seconds. Please watch the ad for at least 10 seconds. Your progress bar has NOT been reset.";
   $("tapAdStatus").textContent=`Only ${Math.floor(elapsed/1000)} seconds completed · 10 seconds required`;
   $("watchDirectAdBtn").disabled=false;$("watchDirectAdBtn").textContent="Watch Ads";
   adStartedAt=0;localStorage.removeItem("pending_tap_ad_started_at");localStorage.setItem("pending_tap_ad_left_app","0");sessionStorage.removeItem("pending_tap_ad_started_at");adReturnProcessing=false;return;
