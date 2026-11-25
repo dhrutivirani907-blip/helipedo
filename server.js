@@ -22,7 +22,7 @@ app.use(cors({origin(o,cb){if(!o||ALLOWED_ORIGINS.has(o))return cb(null,true);re
 app.use(express.json({limit:"30kb"}));
 app.use("/api/",rateLimit({windowMs:60000,limit:180,standardHeaders:true,legacyHeaders:false}));
 const DAILY_AD_LIMIT=100;
-const TAP_REWARD=100000;
+const TAP_REWARD=50000;
 const REF_REWARD=10000000;
 const MIN_WITHDRAW=1000000;
 const activeTapSessions=new Map();
@@ -115,9 +115,21 @@ app.post("/api/tap",requireAccount,async(req,res)=>{
   await client.query("COMMIT");res.json({ok:true,adRequired:true,adToken,account:await payload(req.account.id)});
  }catch(e){try{await client.query("ROLLBACK")}catch{}console.error(e);res.status(500).json({ok:false,error:"Could not process tap."})}finally{client.release()}
 });
-app.post("/api/tap/reset",requireAccount,async(req,res)=>{
- const s=activeTapSessions.get(String(req.account.id));if(!s)return res.status(400).json({ok:false,error:"No completed tap ad session is waiting."});
+app.post("/api/tap/ad-start",requireAccount,async(req,res)=>{
+ const s=activeTapSessions.get(String(req.account.id));
+ const adToken=String(req.body?.adToken||"");
+ if(!s||!adToken||s.token!==adToken)return res.status(400).json({ok:false,error:"Ad session is invalid. Complete the tap cycle again."});
  if(Date.now()-s.createdAt>30*60*1000){activeTapSessions.delete(String(req.account.id));return res.status(400).json({ok:false,error:"Tap ad session expired."})}
+ s.startedAt=Date.now();
+ res.json({ok:true,started:true});
+});
+app.post("/api/tap/reset",requireAccount,async(req,res)=>{
+ const s=activeTapSessions.get(String(req.account.id));
+ const adToken=String(req.body?.adToken||"");
+ if(!s||!adToken||s.token!==adToken)return res.status(400).json({ok:false,error:"Ad session is invalid. Complete the tap cycle again."});
+ if(Date.now()-s.createdAt>30*60*1000){activeTapSessions.delete(String(req.account.id));return res.status(400).json({ok:false,error:"Tap ad session expired."})}
+ if(!s.startedAt)return res.status(400).json({ok:false,error:"Please open the ad first."});
+ if(Date.now()-s.startedAt<10000)return res.status(400).json({ok:false,error:"Watch ads for at least 10 seconds before resetting progress."});
  activeTapSessions.delete(String(req.account.id));
  const r=await pool.query("UPDATE job_accounts SET tap_count=0,updated_at=NOW() WHERE id=$1 AND tap_count=4 RETURNING id",[req.account.id]);
  if(!r.rows[0])return res.status(400).json({ok:false,error:"Tap cycle is not ready to reset."});
