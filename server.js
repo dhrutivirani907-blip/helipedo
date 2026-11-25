@@ -21,7 +21,6 @@ const ALLOWED_ORIGINS=new Set(["https://dhrutivirani907-blip.github.io","http://
 app.use(cors({origin(o,cb){if(!o||ALLOWED_ORIGINS.has(o))return cb(null,true);return cb(new Error("Origin is not allowed by CORS"));},credentials:false,methods:["GET","POST","OPTIONS"],allowedHeaders:["Content-Type","X-Account-Token","X-Admin-Token"],optionsSuccessStatus:204}));
 app.use(express.json({limit:"30kb"}));
 app.use("/api/",rateLimit({windowMs:60000,limit:180,standardHeaders:true,legacyHeaders:false}));
-const DAILY_AD_LIMIT=100;
 const AD_MIN_WATCH_MS=10000;
 const TAP_REWARD=50000;
 const REF_REWARD=10000000;
@@ -36,10 +35,9 @@ function verifyToken(t){try{if(!t)return null;const p=String(t).split(".");if(p.
 function accountId(req){return verifyToken(req.headers["x-account-token"])}
 async function payload(id){
  const r=await pool.query(`SELECT id,name,coin_balance,ads_count,referrals_count,tap_count,ref_code,created_at,last_active_at,
- CASE WHEN daily_ads_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date THEN daily_ads_count ELSE 0 END AS daily_ads_count
  FROM job_accounts WHERE id=$1 AND is_active=TRUE`,[id]);
  if(!r.rows[0])return null;const x=r.rows[0];
- return {id:Number(x.id),name:x.name,coinBalance:Number(x.coin_balance||0),adsCount:Number(x.ads_count||0),dailyAdsCount:Number(x.daily_ads_count||0),referralsCount:Number(x.referrals_count||0),tapCount:Number(x.tap_count||0),refCode:x.ref_code,createdAt:x.created_at,lastActiveAt:x.last_active_at};
+ return {id:Number(x.id),name:x.name,coinBalance:Number(x.coin_balance||0),adsCount:Number(x.ads_count||0),referralsCount:Number(x.referrals_count||0),tapCount:Number(x.tap_count||0),refCode:x.ref_code,createdAt:x.created_at,lastActiveAt:x.last_active_at};
 }
 async function requireAccount(req,res,next){const id=accountId(req);if(!id)return res.status(401).json({ok:false,error:"Account session expired. Please enter your name again."});try{const a=await payload(id);if(!a)return res.status(401).json({ok:false,error:"Account not found."});req.account=a;await pool.query("UPDATE job_accounts SET last_active_at=NOW() WHERE id=$1",[id]);next()}catch(e){console.error(e);res.status(500).json({ok:false,error:"Server error."})}}
 function requireAdmin(req,res,next){const t=String(req.headers["x-admin-token"]||"");const exp=sign("admin:"+ADMIN_PASSWORD);try{if(!t||t.length!==exp.length||!crypto.timingSafeEqual(Buffer.from(t),Buffer.from(exp)))return res.status(401).json({ok:false,error:"Admin authentication required."});next()}catch{return res.status(401).json({ok:false,error:"Admin authentication required."})}}
@@ -111,15 +109,8 @@ app.post("/api/tap",requireAccount,async(req,res)=>{
  const client=await pool.connect();
  try{
   await client.query("BEGIN");
-  // Daily counter uses India local date and resets automatically on a new day.
-  await client.query(`UPDATE job_accounts SET
-    daily_ads_count=CASE WHEN daily_ads_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date THEN daily_ads_count ELSE 0 END,
-    daily_ads_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date
-    WHERE id=$1`,[req.account.id]);
-  const r=await client.query("SELECT tap_count,daily_ads_count FROM job_accounts WHERE id=$1 AND is_active=TRUE FOR UPDATE",[req.account.id]);
+  const r=await client.query("SELECT tap_count FROM job_accounts WHERE id=$1 AND is_active=TRUE FOR UPDATE",[req.account.id]);
   if(!r.rows[0]){await client.query("ROLLBACK");return res.status(404).json({ok:false,error:"Account not found."})}
-  const dailyCount=Number(r.rows[0].daily_ads_count||0);
-  if(dailyCount>=DAILY_AD_LIMIT){await client.query("ROLLBACK");return res.status(429).json({ok:false,error:"Daily ad limit reached (100/100). Please come back tomorrow."})}
   const current=Number(r.rows[0].tap_count||0);
   if(current>=4){await client.query("ROLLBACK");return res.status(409).json({ok:false,error:"Complete the current ad cycle first."})}
   const next=current+1;
@@ -151,13 +142,10 @@ app.post("/api/tap/reset",requireAccount,async(req,res)=>{
  const r=await pool.query(`UPDATE job_accounts SET
    tap_count=0,
    ads_count=ads_count+1,
-   daily_ads_count=CASE WHEN daily_ads_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date THEN daily_ads_count+1 ELSE 1 END,
-   daily_ads_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date,
    updated_at=NOW()
    WHERE id=$1 AND tap_count=4
-     AND (CASE WHEN daily_ads_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date THEN daily_ads_count ELSE 0 END) < $2
-   RETURNING id`,[req.account.id,DAILY_AD_LIMIT]);
- if(!r.rows[0])return res.status(400).json({ok:false,error:"Daily limit reached or tap cycle is not ready to reset."});
+   RETURNING id`,[req.account.id]);
+ if(!r.rows[0])return res.status(400).json({ok:false,error:"Tap cycle is not ready to reset."});
  res.json({ok:true,account:await payload(req.account.id)});
 });
 
