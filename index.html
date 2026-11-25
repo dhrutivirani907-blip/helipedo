@@ -256,7 +256,15 @@ async function startDirectAd(){
   sessionStorage.setItem("pending_tap_ad_started_at",String(adStartedAt));
   $("tapAdMessage").textContent="Ad opened. Stay on the ad for at least 10 seconds, then return to this app.";
   $("tapAdStatus").textContent="Waiting for you to return…";
-  window.location.assign("https://uplcm.com/4/11513244");
+  const adUrl="https://uplcm.com/4/11513244";
+  // Telegram Mini Apps: open HTTPS links in the device's external browser,
+  // not inside Telegram's in-app webview.
+  if(tg && typeof tg.openLink==="function"){
+   tg.openLink(adUrl,{try_instant_view:false});
+  }else{
+   const opened=window.open(adUrl,"_blank","noopener,noreferrer");
+   if(!opened)window.location.href=adUrl;
+  }
  }catch(e){
   btn.disabled=false;btn.textContent="Watch Ads";toast(e.message||"Could not open the ad.");
  }
