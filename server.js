@@ -25,7 +25,6 @@ const AD_MIN_WATCH_MS=10000;
 const TAP_REWARD=50000;
 const REF_REWARD=10000000;
 const MIN_WITHDRAW=1000000;
-const activeTapSessions=new Map();
 
 function normalize(v){return String(v??"").trim().replace(/\s+/g," ")}
 function validName(v){return v.length>=2&&v.length<=40&&/^[\p{L}\p{N} ._-]+$/u.test(v)}
@@ -66,6 +65,13 @@ async function initDb(){
  // The fourth tap is a valid state while the user completes the ad step.
  await pool.query("ALTER TABLE job_accounts DROP CONSTRAINT IF EXISTS job_accounts_tap_count_check");
  await pool.query("ALTER TABLE job_accounts ADD CONSTRAINT job_accounts_tap_count_check CHECK(tap_count BETWEEN 0 AND 4)");
+ // Keep ad sessions in PostgreSQL so Render restarts do not invalidate a user's 4/4 cycle.
+ await pool.query(`CREATE TABLE IF NOT EXISTS tap_ad_sessions(
+  account_id BIGINT PRIMARY KEY REFERENCES job_accounts(id) ON DELETE CASCADE,
+  ad_token VARCHAR(128) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  started_at TIMESTAMPTZ
+ )`);
  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS job_accounts_ref_code_idx ON job_accounts(ref_code) WHERE ref_code IS NOT NULL`);
  await pool.query(`CREATE TABLE IF NOT EXISTS withdrawals(
  id BIGSERIAL PRIMARY KEY,account_id BIGINT NOT NULL REFERENCES job_accounts(id) ON DELETE CASCADE,
@@ -121,34 +127,50 @@ app.post("/api/tap",requireAccount,async(req,res)=>{
    await client.query("COMMIT");return res.json({ok:true,adRequired:false,account:await payload(req.account.id)});
   }
   await client.query("UPDATE job_accounts SET tap_count=4,coin_balance=coin_balance+$1,last_active_at=NOW(),updated_at=NOW() WHERE id=$2",[TAP_REWARD,req.account.id]);
-  const adToken=crypto.randomBytes(24).toString("hex");activeTapSessions.set(String(req.account.id),{token:adToken,createdAt:Date.now()});
+  const adToken=crypto.randomBytes(24).toString("hex");
+  await client.query("INSERT INTO tap_ad_sessions(account_id,ad_token,created_at,started_at) VALUES($1,$2,NOW(),NULL) ON CONFLICT(account_id) DO UPDATE SET ad_token=EXCLUDED.ad_token,created_at=NOW(),started_at=NULL",[req.account.id,adToken]);
   await client.query("COMMIT");res.json({ok:true,adRequired:true,adToken,account:await payload(req.account.id)});
  }catch(e){try{await client.query("ROLLBACK")}catch{}console.error(e);res.status(500).json({ok:false,error:"Could not process tap."})}finally{client.release()}
 });
+app.get("/api/tap/ad-session",requireAccount,async(req,res)=>{
+ try{
+  const a=await pool.query("SELECT tap_count FROM job_accounts WHERE id=$1 AND is_active=TRUE",[req.account.id]);
+  if(!a.rows[0]||Number(a.rows[0].tap_count)!==4)return res.status(409).json({ok:false,error:"Complete the 4-tap cycle first."});
+  let r=await pool.query("SELECT ad_token,started_at FROM tap_ad_sessions WHERE account_id=$1",[req.account.id]);
+  if(!r.rows[0]){
+   const freshToken=crypto.randomBytes(24).toString("hex");
+   await pool.query("INSERT INTO tap_ad_sessions(account_id,ad_token) VALUES($1,$2) ON CONFLICT(account_id) DO NOTHING",[req.account.id,freshToken]);
+   r=await pool.query("SELECT ad_token,started_at FROM tap_ad_sessions WHERE account_id=$1",[req.account.id]);
+  }
+  res.json({ok:true,adToken:r.rows[0].ad_token,startedAt:r.rows[0].started_at?new Date(r.rows[0].started_at).getTime():0});
+ }catch(e){console.error(e);res.status(500).json({ok:false,error:"Could not restore ad session."})}
+});
 app.post("/api/tap/ad-start",requireAccount,async(req,res)=>{
- const s=activeTapSessions.get(String(req.account.id));
  const adToken=String(req.body?.adToken||"");
- if(!s||!adToken||s.token!==adToken)return res.status(400).json({ok:false,error:"Ad session is invalid. Complete the tap cycle again."});
- if(Date.now()-s.createdAt>30*60*1000){activeTapSessions.delete(String(req.account.id));return res.status(400).json({ok:false,error:"Tap ad session expired."})}
- s.startedAt=Date.now();
- res.json({ok:true,started:true,startedAt:s.startedAt});
+ if(!adToken)return res.status(400).json({ok:false,error:"Ad session is missing. Please reopen the ad step."});
+ try{
+  const r=await pool.query(`UPDATE tap_ad_sessions s SET started_at=NOW()
+   FROM job_accounts a WHERE s.account_id=$1 AND s.account_id=a.id AND a.tap_count=4 AND s.ad_token=$2
+   RETURNING s.started_at`,[req.account.id,adToken]);
+  if(!r.rows[0])return res.status(400).json({ok:false,error:"Ad session is invalid. Please reopen the ad step."});
+  res.json({ok:true,started:true,startedAt:new Date(r.rows[0].started_at).getTime()});
+ }catch(e){console.error(e);res.status(500).json({ok:false,error:"Could not start ad session."})}
 });
 app.post("/api/tap/reset",requireAccount,async(req,res)=>{
- const s=activeTapSessions.get(String(req.account.id));
- const adToken=String(req.body?.adToken||"");
- if(!s||!adToken||s.token!==adToken)return res.status(400).json({ok:false,error:"Ad session is invalid. Complete the tap cycle again."});
- if(Date.now()-s.createdAt>30*60*1000){activeTapSessions.delete(String(req.account.id));return res.status(400).json({ok:false,error:"Tap ad session expired."})}
- if(!s.startedAt)return res.status(400).json({ok:false,error:"Please open the ad first."});
- if(Date.now()-s.startedAt<AD_MIN_WATCH_MS)return res.status(400).json({ok:false,error:"Watch ads for at least 10 seconds before resetting progress."});
- activeTapSessions.delete(String(req.account.id));
- const r=await pool.query(`UPDATE job_accounts SET
-   tap_count=0,
-   ads_count=ads_count+1,
-   updated_at=NOW()
-   WHERE id=$1 AND tap_count=4
-   RETURNING id`,[req.account.id]);
- if(!r.rows[0])return res.status(400).json({ok:false,error:"Tap cycle is not ready to reset."});
- res.json({ok:true,account:await payload(req.account.id)});
+ const adToken=String(req.body?.adToken||"");if(!adToken)return res.status(400).json({ok:false,error:"Ad session is missing."});
+ const client=await pool.connect();
+ try{
+  await client.query("BEGIN");
+  const session=await client.query("SELECT started_at FROM tap_ad_sessions WHERE account_id=$1 AND ad_token=$2 FOR UPDATE",[req.account.id,adToken]);
+  if(!session.rows[0]){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Ad session is invalid. Please reopen the ad step."})}
+  if(!session.rows[0].started_at){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Please open the ad first."})}
+  const elapsed=Date.now()-new Date(session.rows[0].started_at).getTime();
+  if(elapsed<AD_MIN_WATCH_MS){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Watch ads for at least 10 seconds before resetting progress."})}
+  const updated=await client.query("UPDATE job_accounts SET tap_count=0,ads_count=ads_count+1,updated_at=NOW() WHERE id=$1 AND tap_count=4 RETURNING id",[req.account.id]);
+  if(!updated.rows[0]){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Tap cycle is not ready to reset."})}
+  await client.query("DELETE FROM tap_ad_sessions WHERE account_id=$1",[req.account.id]);
+  await client.query("COMMIT");res.json({ok:true,account:await payload(req.account.id)});
+ }catch(e){try{await client.query("ROLLBACK")}catch{}console.error(e);res.status(500).json({ok:false,error:"Could not reset tap progress."})}finally{client.release()}
 });
 
 app.post("/api/withdrawals",requireAccount,async(req,res)=>{
