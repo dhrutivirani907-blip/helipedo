@@ -247,26 +247,49 @@ function openTapAdModal(){
 }
 async function startDirectAd(){
  if(!activeAdToken)return;
- const btn=$("watchDirectAdBtn");btn.disabled=true;btn.textContent="Opening ad…";
+ const btn=$("watchDirectAdBtn");
+ const adUrl="https://uplcm.com/4/11513244";
+ let openedTab=null;
+ let linkOpened=false;
+
+ // Open synchronously during the real button click, before any await.
+ // Telegram's openLink must also be called before the async server request.
  try{
-  // Start the server-side ad session, then navigate this same tab directly to the ad URL.
+  if(tg && typeof tg.openLink==="function"){
+   tg.openLink(adUrl,{try_instant_view:false});
+   linkOpened=true;
+  }else{
+   openedTab=window.open("about:blank","_blank");
+   if(openedTab){
+    openedTab.opener=null;
+    openedTab.location.href=adUrl;
+    linkOpened=true;
+   }else{
+    window.location.href=adUrl;
+    linkOpened=true;
+   }
+  }
+ }catch(openError){
+  try{
+   if(openedTab&&!openedTab.closed)openedTab.location.href=adUrl;
+   else window.location.href=adUrl;
+   linkOpened=true;
+  }catch(_){}
+ }
+
+ btn.disabled=true;btn.textContent="Opening ad…";
+ try{
   await api("/api/tap/ad-start",{method:"POST",body:JSON.stringify({adToken:activeAdToken})});
   adStartedAt=Date.now();
   localStorage.setItem("pending_tap_ad_token",activeAdToken);
   sessionStorage.setItem("pending_tap_ad_started_at",String(adStartedAt));
   $("tapAdMessage").textContent="Ad opened. Stay on the ad for at least 10 seconds, then return to this app.";
   $("tapAdStatus").textContent="Waiting for you to return…";
-  const adUrl="https://uplcm.com/4/11513244";
-  // Telegram Mini Apps: open HTTPS links in the device's external browser,
-  // not inside Telegram's in-app webview.
-  if(tg && typeof tg.openLink==="function"){
-   tg.openLink(adUrl,{try_instant_view:false});
-  }else{
-   const opened=window.open(adUrl,"_blank","noopener,noreferrer");
-   if(!opened)window.location.href=adUrl;
-  }
+  if(!linkOpened)throw new Error("Could not open the ad link. Please allow external links and try again.");
  }catch(e){
-  btn.disabled=false;btn.textContent="Watch Ads";toast(e.message||"Could not open the ad.");
+  if(openedTab&&!openedTab.closed){try{openedTab.close()}catch(_){}}
+  btn.disabled=false;btn.textContent="Watch Ads";
+  toast(e.message||"Could not start the ad. Please try again.");
  }
 }
 async function handleAdReturn(){
