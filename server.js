@@ -34,7 +34,7 @@ function tokenFor(id){const p=`${id}.${Date.now()}`;return `${p}.${sign(p)}`}
 function verifyToken(t){try{if(!t)return null;const p=String(t).split(".");if(p.length!==3)return null;const[id,issued,sig]=p;if(!/^\d+$/.test(id)||!/^\d+$/.test(issued))return null;if(Date.now()-Number(issued)>180*24*60*60*1000)return null;const exp=sign(`${id}.${issued}`);if(sig.length!==exp.length||!crypto.timingSafeEqual(Buffer.from(sig),Buffer.from(exp)))return null;return Number(id)}catch{return null}}
 function accountId(req){return verifyToken(req.headers["x-account-token"])}
 async function payload(id){
- const r=await pool.query(`SELECT id,name,coin_balance,ads_count,referrals_count,tap_count,ref_code,created_at,last_active_at,
+ const r=await pool.query(`SELECT id,name,coin_balance,ads_count,referrals_count,tap_count,ref_code,created_at,last_active_at
  FROM job_accounts WHERE id=$1 AND is_active=TRUE`,[id]);
  if(!r.rows[0])return null;const x=r.rows[0];
  return {id:Number(x.id),name:x.name,coinBalance:Number(x.coin_balance||0),adsCount:Number(x.ads_count||0),referralsCount:Number(x.referrals_count||0),tapCount:Number(x.tap_count||0),refCode:x.ref_code,createdAt:x.created_at,lastActiveAt:x.last_active_at};
@@ -44,7 +44,7 @@ function requireAdmin(req,res,next){const t=String(req.headers["x-admin-token"]|
 
 async function initDb(){
  await pool.query(`CREATE TABLE IF NOT EXISTS job_accounts(
- id BIGSERIAL PRIMARY KEY,name VARCHAR(40) NOT NULL,name_key VARCHAR(40) NOT NULL UNIQUE,
+ id BIGSERIAL PRIMARY KEY,name VARCHAR(40) NOT NULL,name_key VARCHAR(40) NOT NULL,
  coin_balance BIGINT NOT NULL DEFAULT 0 CHECK(coin_balance>=0),ads_count BIGINT NOT NULL DEFAULT 0 CHECK(ads_count>=0),
  referrals_count INTEGER NOT NULL DEFAULT 0 CHECK(referrals_count>=0),tap_count INTEGER NOT NULL DEFAULT 0 CHECK(tap_count BETWEEN 0 AND 3),
  ref_code VARCHAR(80) UNIQUE,referrer_id BIGINT REFERENCES job_accounts(id),is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -60,6 +60,9 @@ async function initDb(){
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS daily_ads_count INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS daily_ads_date DATE"
  ]){try{await pool.query(sql)}catch(e){if(!String(e.message).includes("already exists"))throw e}}
+ // Allow multiple accounts to use the same display name. Remove the legacy unique constraint.
+ await pool.query("ALTER TABLE job_accounts DROP CONSTRAINT IF EXISTS job_accounts_name_key_key");
+ await pool.query("DROP INDEX IF EXISTS job_accounts_name_key_key");
  // The fourth tap is a valid state while the user completes the ad step.
  await pool.query("ALTER TABLE job_accounts DROP CONSTRAINT IF EXISTS job_accounts_tap_count_check");
  await pool.query("ALTER TABLE job_accounts ADD CONSTRAINT job_accounts_tap_count_check CHECK(tap_count BETWEEN 0 AND 4)");
@@ -93,7 +96,6 @@ app.post("/api/account",async(req,res)=>{
  const client=await pool.connect();
  try{
   await client.query("BEGIN");
-  const exists=await client.query("SELECT id FROM job_accounts WHERE name_key=$1",[key]);if(exists.rows[0]){await client.query("ROLLBACK");return res.status(409).json({ok:false,error:"This name already has an account."})}
   if(refCode){const rr=await client.query("SELECT id FROM job_accounts WHERE ref_code=$1 AND is_active=TRUE",[refCode]);if(rr.rows[0])referrerId=rr.rows[0].id}
   const code=crypto.randomBytes(8).toString("hex");
   const created=await client.query(`INSERT INTO job_accounts(name,name_key,ref_code,referrer_id) VALUES($1,$2,$3,$4) RETURNING id`,[name,key,code,referrerId]);
