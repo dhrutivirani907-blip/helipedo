@@ -172,7 +172,7 @@ app.post("/api/tap/reset",requireAccount,async(req,res)=>{
   if(elapsed<AD_MIN_WATCH_MS){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Watch ads for at least 10 seconds before resetting progress."})}
   const updated=await client.query(`UPDATE job_accounts
    SET tap_count=0,ads_count=ads_count+1,
-       cooldown_until=CASE WHEN (ads_count+1)%5=0 THEN NOW()+INTERVAL '1 minute' ELSE cooldown_until END,
+       cooldown_until=CASE WHEN (ads_count+1)%10=0 THEN NOW()+INTERVAL '1 minute' ELSE cooldown_until END,
        updated_at=NOW()
    WHERE id=$1 AND tap_count=4 RETURNING id,ads_count,cooldown_until`,[req.account.id]);
   if(!updated.rows[0]){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Tap cycle is not ready to reset."})}
