@@ -33,10 +33,10 @@ function tokenFor(id){const p=`${id}.${Date.now()}`;return `${p}.${sign(p)}`}
 function verifyToken(t){try{if(!t)return null;const p=String(t).split(".");if(p.length!==3)return null;const[id,issued,sig]=p;if(!/^\d+$/.test(id)||!/^\d+$/.test(issued))return null;if(Date.now()-Number(issued)>180*24*60*60*1000)return null;const exp=sign(`${id}.${issued}`);if(sig.length!==exp.length||!crypto.timingSafeEqual(Buffer.from(sig),Buffer.from(exp)))return null;return Number(id)}catch{return null}}
 function accountId(req){return verifyToken(req.headers["x-account-token"])}
 async function payload(id){
- const r=await pool.query(`SELECT id,name,coin_balance,ads_count,referrals_count,tap_count,ref_code,created_at,last_active_at
+ const r=await pool.query(`SELECT id,name,coin_balance,ads_count,referrals_count,tap_count,ref_code,created_at,last_active_at,cooldown_until
  FROM job_accounts WHERE id=$1 AND is_active=TRUE`,[id]);
  if(!r.rows[0])return null;const x=r.rows[0];
- return {id:Number(x.id),name:x.name,coinBalance:Number(x.coin_balance||0),adsCount:Number(x.ads_count||0),referralsCount:Number(x.referrals_count||0),tapCount:Number(x.tap_count||0),refCode:x.ref_code,createdAt:x.created_at,lastActiveAt:x.last_active_at};
+ return {id:Number(x.id),name:x.name,coinBalance:Number(x.coin_balance||0),adsCount:Number(x.ads_count||0),referralsCount:Number(x.referrals_count||0),tapCount:Number(x.tap_count||0),cooldownUntil:x.cooldown_until?new Date(x.cooldown_until).getTime():0,refCode:x.ref_code,createdAt:x.created_at,lastActiveAt:x.last_active_at};
 }
 async function requireAccount(req,res,next){const id=accountId(req);if(!id)return res.status(401).json({ok:false,error:"Account session expired. Please enter your name again."});try{const a=await payload(id);if(!a)return res.status(401).json({ok:false,error:"Account not found."});req.account=a;await pool.query("UPDATE job_accounts SET last_active_at=NOW() WHERE id=$1",[id]);next()}catch(e){console.error(e);res.status(500).json({ok:false,error:"Server error."})}}
 function requireAdmin(req,res,next){const t=String(req.headers["x-admin-token"]||"");const exp=sign("admin:"+ADMIN_PASSWORD);try{if(!t||t.length!==exp.length||!crypto.timingSafeEqual(Buffer.from(t),Buffer.from(exp)))return res.status(401).json({ok:false,error:"Admin authentication required."});next()}catch{return res.status(401).json({ok:false,error:"Admin authentication required."})}}
@@ -57,7 +57,8 @@ async function initDb(){
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS referrer_id BIGINT",
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS daily_ads_count INTEGER NOT NULL DEFAULT 0",
-  "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS daily_ads_date DATE"
+  "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS daily_ads_date DATE",
+  "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS cooldown_until TIMESTAMPTZ"
  ]){try{await pool.query(sql)}catch(e){if(!String(e.message).includes("already exists"))throw e}}
  // Allow multiple accounts to use the same display name. Remove the legacy unique constraint.
  await pool.query("ALTER TABLE job_accounts DROP CONSTRAINT IF EXISTS job_accounts_name_key_key");
@@ -117,8 +118,11 @@ app.post("/api/tap",requireAccount,async(req,res)=>{
  const client=await pool.connect();
  try{
   await client.query("BEGIN");
-  const r=await client.query("SELECT tap_count FROM job_accounts WHERE id=$1 AND is_active=TRUE FOR UPDATE",[req.account.id]);
+  const r=await client.query("SELECT tap_count,cooldown_until FROM job_accounts WHERE id=$1 AND is_active=TRUE FOR UPDATE",[req.account.id]);
   if(!r.rows[0]){await client.query("ROLLBACK");return res.status(404).json({ok:false,error:"Account not found."})}
+  if(r.rows[0].cooldown_until&&new Date(r.rows[0].cooldown_until).getTime()>Date.now()){
+   const until=new Date(r.rows[0].cooldown_until).getTime();await client.query("ROLLBACK");return res.status(429).json({ok:false,error:"Tap locked. Please wait for the cooldown to finish.",cooldownUntil:until});
+  }
   const current=Number(r.rows[0].tap_count||0);
   if(current>=4){await client.query("ROLLBACK");return res.status(409).json({ok:false,error:"Complete the current ad cycle first."})}
   const next=current+1;
@@ -166,7 +170,11 @@ app.post("/api/tap/reset",requireAccount,async(req,res)=>{
   if(!session.rows[0].started_at){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Please open the ad first."})}
   const elapsed=Date.now()-new Date(session.rows[0].started_at).getTime();
   if(elapsed<AD_MIN_WATCH_MS){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Watch ads for at least 10 seconds before resetting progress."})}
-  const updated=await client.query("UPDATE job_accounts SET tap_count=0,ads_count=ads_count+1,updated_at=NOW() WHERE id=$1 AND tap_count=4 RETURNING id",[req.account.id]);
+  const updated=await client.query(`UPDATE job_accounts
+   SET tap_count=0,ads_count=ads_count+1,
+       cooldown_until=CASE WHEN (ads_count+1)%5=0 THEN NOW()+INTERVAL '1 minute' ELSE cooldown_until END,
+       updated_at=NOW()
+   WHERE id=$1 AND tap_count=4 RETURNING id,ads_count,cooldown_until`,[req.account.id]);
   if(!updated.rows[0]){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Tap cycle is not ready to reset."})}
   await client.query("DELETE FROM tap_ad_sessions WHERE account_id=$1",[req.account.id]);
   await client.query("COMMIT");res.json({ok:true,account:await payload(req.account.id)});
