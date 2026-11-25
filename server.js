@@ -34,9 +34,11 @@ function tokenFor(id){const p=`${id}.${Date.now()}`;return `${p}.${sign(p)}`}
 function verifyToken(t){try{if(!t)return null;const p=String(t).split(".");if(p.length!==3)return null;const[id,issued,sig]=p;if(!/^\d+$/.test(id)||!/^\d+$/.test(issued))return null;if(Date.now()-Number(issued)>180*24*60*60*1000)return null;const exp=sign(`${id}.${issued}`);if(sig.length!==exp.length||!crypto.timingSafeEqual(Buffer.from(sig),Buffer.from(exp)))return null;return Number(id)}catch{return null}}
 function accountId(req){return verifyToken(req.headers["x-account-token"])}
 async function payload(id){
- const r=await pool.query(`SELECT id,name,coin_balance,ads_count,referrals_count,tap_count,ref_code,created_at,last_active_at FROM job_accounts WHERE id=$1 AND is_active=TRUE`,[id]);
+ const r=await pool.query(`SELECT id,name,coin_balance,ads_count,referrals_count,tap_count,ref_code,created_at,last_active_at,
+ CASE WHEN daily_ads_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date THEN daily_ads_count ELSE 0 END AS daily_ads_count
+ FROM job_accounts WHERE id=$1 AND is_active=TRUE`,[id]);
  if(!r.rows[0])return null;const x=r.rows[0];
- return {id:Number(x.id),name:x.name,coinBalance:Number(x.coin_balance||0),adsCount:Number(x.ads_count||0),referralsCount:Number(x.referrals_count||0),tapCount:Number(x.tap_count||0),refCode:x.ref_code,createdAt:x.created_at,lastActiveAt:x.last_active_at};
+ return {id:Number(x.id),name:x.name,coinBalance:Number(x.coin_balance||0),adsCount:Number(x.ads_count||0),dailyAdsCount:Number(x.daily_ads_count||0),referralsCount:Number(x.referrals_count||0),tapCount:Number(x.tap_count||0),refCode:x.ref_code,createdAt:x.created_at,lastActiveAt:x.last_active_at};
 }
 async function requireAccount(req,res,next){const id=accountId(req);if(!id)return res.status(401).json({ok:false,error:"Account session expired. Please enter your name again."});try{const a=await payload(id);if(!a)return res.status(401).json({ok:false,error:"Account not found."});req.account=a;await pool.query("UPDATE job_accounts SET last_active_at=NOW() WHERE id=$1",[id]);next()}catch(e){console.error(e);res.status(500).json({ok:false,error:"Server error."})}}
 function requireAdmin(req,res,next){const t=String(req.headers["x-admin-token"]||"");const exp=sign("admin:"+ADMIN_PASSWORD);try{if(!t||t.length!==exp.length||!crypto.timingSafeEqual(Buffer.from(t),Buffer.from(exp)))return res.status(401).json({ok:false,error:"Admin authentication required."});next()}catch{return res.status(401).json({ok:false,error:"Admin authentication required."})}}
@@ -55,8 +57,13 @@ async function initDb(){
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS tap_count INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS ref_code VARCHAR(80)",
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS referrer_id BIGINT",
-  "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+  "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+  "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS daily_ads_count INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS daily_ads_date DATE"
  ]){try{await pool.query(sql)}catch(e){if(!String(e.message).includes("already exists"))throw e}}
+ // The fourth tap is a valid state while the user completes the ad step.
+ await pool.query("ALTER TABLE job_accounts DROP CONSTRAINT IF EXISTS job_accounts_tap_count_check");
+ await pool.query("ALTER TABLE job_accounts ADD CONSTRAINT job_accounts_tap_count_check CHECK(tap_count BETWEEN 0 AND 4)");
  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS job_accounts_ref_code_idx ON job_accounts(ref_code) WHERE ref_code IS NOT NULL`);
  await pool.query(`CREATE TABLE IF NOT EXISTS withdrawals(
  id BIGSERIAL PRIMARY KEY,account_id BIGINT NOT NULL REFERENCES job_accounts(id) ON DELETE CASCADE,
@@ -103,8 +110,17 @@ app.post("/api/tap",requireAccount,async(req,res)=>{
  const client=await pool.connect();
  try{
   await client.query("BEGIN");
-  const r=await client.query("SELECT tap_count FROM job_accounts WHERE id=$1 AND is_active=TRUE FOR UPDATE",[req.account.id]);if(!r.rows[0]){await client.query("ROLLBACK");return res.status(404).json({ok:false,error:"Account not found."})}
-  const current=Number(r.rows[0].tap_count||0);if(current>=4){await client.query("ROLLBACK");return res.status(409).json({ok:false,error:"Complete the current ad cycle first."})}
+  // Daily counter uses India local date and resets automatically on a new day.
+  await client.query(`UPDATE job_accounts SET
+    daily_ads_count=CASE WHEN daily_ads_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date THEN daily_ads_count ELSE 0 END,
+    daily_ads_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date
+    WHERE id=$1`,[req.account.id]);
+  const r=await client.query("SELECT tap_count,daily_ads_count FROM job_accounts WHERE id=$1 AND is_active=TRUE FOR UPDATE",[req.account.id]);
+  if(!r.rows[0]){await client.query("ROLLBACK");return res.status(404).json({ok:false,error:"Account not found."})}
+  const dailyCount=Number(r.rows[0].daily_ads_count||0);
+  if(dailyCount>=DAILY_AD_LIMIT){await client.query("ROLLBACK");return res.status(429).json({ok:false,error:"Daily ad limit reached (100/100). Please come back tomorrow."})}
+  const current=Number(r.rows[0].tap_count||0);
+  if(current>=4){await client.query("ROLLBACK");return res.status(409).json({ok:false,error:"Complete the current ad cycle first."})}
   const next=current+1;
   if(next<4){
    await client.query("UPDATE job_accounts SET tap_count=$1,coin_balance=coin_balance+$2,last_active_at=NOW(),updated_at=NOW() WHERE id=$3",[next,TAP_REWARD,req.account.id]);
@@ -131,8 +147,16 @@ app.post("/api/tap/reset",requireAccount,async(req,res)=>{
  if(!s.startedAt)return res.status(400).json({ok:false,error:"Please open the ad first."});
  if(Date.now()-s.startedAt<10000)return res.status(400).json({ok:false,error:"Watch ads for at least 10 seconds before resetting progress."});
  activeTapSessions.delete(String(req.account.id));
- const r=await pool.query("UPDATE job_accounts SET tap_count=0,updated_at=NOW() WHERE id=$1 AND tap_count=4 RETURNING id",[req.account.id]);
- if(!r.rows[0])return res.status(400).json({ok:false,error:"Tap cycle is not ready to reset."});
+ const r=await pool.query(`UPDATE job_accounts SET
+   tap_count=0,
+   ads_count=ads_count+1,
+   daily_ads_count=CASE WHEN daily_ads_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date THEN daily_ads_count+1 ELSE 1 END,
+   daily_ads_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date,
+   updated_at=NOW()
+   WHERE id=$1 AND tap_count=4
+     AND (CASE WHEN daily_ads_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date THEN daily_ads_count ELSE 0 END) < $2
+   RETURNING id`,[req.account.id,DAILY_AD_LIMIT]);
+ if(!r.rows[0])return res.status(400).json({ok:false,error:"Daily limit reached or tap cycle is not ready to reset."});
  res.json({ok:true,account:await payload(req.account.id)});
 });
 
