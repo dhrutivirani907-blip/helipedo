@@ -217,7 +217,10 @@ function restorePendingAdState(){
  if(savedStart)adStartedAt=savedStart;
  if(activeAdToken&&adStartedAt){
   openTapAdModal();
-  handleAdReturn();
+  // Do not treat the initial page load/focus as an ad return.
+  if(localStorage.getItem("pending_tap_ad_left_app")==="1"){
+   setTimeout(checkAdReturn,250);
+  }
  }
 }
 async function loadAccount(){try{
@@ -256,6 +259,7 @@ async function startDirectAd(){
  adStartedAt=Date.now();
  localStorage.setItem("pending_tap_ad_token",activeAdToken);
  localStorage.setItem("pending_tap_ad_started_at",String(adStartedAt));
+ localStorage.setItem("pending_tap_ad_left_app","0");
  sessionStorage.setItem("pending_tap_ad_started_at",String(adStartedAt));
  btn.disabled=true;btn.textContent="Opening ad…";
  $("tapAdMessage").textContent="Ad opened. Stay on the ad for at least 10 seconds, then return to this app.";
@@ -282,6 +286,7 @@ async function startDirectAd(){
   if(openedTab&&!openedTab.closed){try{openedTab.close()}catch(_){}}
   adStartedAt=0;
   localStorage.removeItem("pending_tap_ad_started_at");
+  localStorage.setItem("pending_tap_ad_left_app","0");
   sessionStorage.removeItem("pending_tap_ad_started_at");
   btn.disabled=false;btn.textContent="Watch Ads";
   toast(e.message||"Could not start the ad. Please try again.");
@@ -296,12 +301,12 @@ async function handleAdReturn(){
   $("tapAdMessage").textContent="You returned before 10 seconds. Watch the ad for at least 10 seconds, then come back. Your progress bar has NOT been reset.";
   $("tapAdStatus").textContent=`Only ${Math.floor(elapsed/1000)} seconds completed · 10 seconds required`;
   $("watchDirectAdBtn").disabled=false;$("watchDirectAdBtn").textContent="Watch Ads";
-  adStartedAt=0;localStorage.removeItem("pending_tap_ad_started_at");sessionStorage.removeItem("pending_tap_ad_started_at");adReturnProcessing=false;return;
+  adStartedAt=0;localStorage.removeItem("pending_tap_ad_started_at");localStorage.setItem("pending_tap_ad_left_app","0");sessionStorage.removeItem("pending_tap_ad_started_at");adReturnProcessing=false;return;
  }
  try{
   const d=await api("/api/tap/reset",{method:"POST",body:JSON.stringify({adToken:activeAdToken})});
   setAccount(d.account);activeAdToken="";adStartedAt=0;adCompleted=true;adReturnProcessing=false;
-  localStorage.removeItem("pending_tap_ad_token");localStorage.removeItem("pending_tap_ad_started_at");sessionStorage.removeItem("pending_tap_ad_started_at");
+  localStorage.removeItem("pending_tap_ad_token");localStorage.removeItem("pending_tap_ad_started_at");localStorage.removeItem("pending_tap_ad_left_app");sessionStorage.removeItem("pending_tap_ad_started_at");
   $("tapAdTitle").textContent="Progress bar reset complete!";
   $("tapAdMessage").textContent="Thank you for watching the ad for at least 10 seconds. Your tap progress has been reset.";
   $("tapAdStatus").textContent="✓ Cycle completed · Progress: 0 / 4";$("watchDirectAdBtn").style.display="none";
@@ -400,22 +405,29 @@ async function renderAdminUsers(c){
 window.resetUser=async id=>{if(!confirm("Reset this user's balance, ads and referrals to zero?"))return;try{await api(`/api/admin/users/${id}/reset`,{method:"POST",body:"{}"});toast("User reset");loadAdminPanel(5)}catch(e){toast(e.message)}}
 $("profileModal").onclick=e=>{if(e.target.id==="profileModal")closeModal("profileModal")};$("adminLoginModal").onclick=e=>{if(e.target.id==="adminLoginModal")closeModal("adminLoginModal")};$("adminModal").onclick=e=>{if(e.target.id==="adminModal")closeModal("adminModal")};
 function checkAdReturn(){
- if(!activeAdToken){
-  activeAdToken=localStorage.getItem("pending_tap_ad_token")||"";
- }
- if(!adStartedAt){
-  adStartedAt=Number(localStorage.getItem("pending_tap_ad_started_at")||sessionStorage.getItem("pending_tap_ad_started_at")||0);
- }
- if(activeAdToken&&adStartedAt){
-  showModal("tapAdModal");
-  handleAdReturn();
+ if(document.visibilityState==="hidden")return;
+ if(localStorage.getItem("pending_tap_ad_left_app")!=="1")return;
+ if(!activeAdToken)activeAdToken=localStorage.getItem("pending_tap_ad_token")||"";
+ if(!adStartedAt)adStartedAt=Number(localStorage.getItem("pending_tap_ad_started_at")||sessionStorage.getItem("pending_tap_ad_started_at")||0);
+ if(!activeAdToken||!adStartedAt)return;
+ // Consume the return marker once so focus/pageshow cannot run the same check twice.
+ localStorage.setItem("pending_tap_ad_left_app","0");
+ showModal("tapAdModal");
+ handleAdReturn();
+}
+function markAdAppLeft(){
+ if(localStorage.getItem("pending_tap_ad_token")&&localStorage.getItem("pending_tap_ad_started_at")){
+  localStorage.setItem("pending_tap_ad_left_app","1");
  }
 }
 document.addEventListener("visibilitychange",()=>{
- if(document.visibilityState==="visible")checkAdReturn();
+ if(document.visibilityState==="hidden")markAdAppLeft();
+ else setTimeout(checkAdReturn,300);
 });
-window.addEventListener("focus",checkAdReturn);
-window.addEventListener("pageshow",checkAdReturn);
+window.addEventListener("pagehide",markAdAppLeft);
+window.addEventListener("blur",markAdAppLeft);
+window.addEventListener("focus",()=>setTimeout(checkAdReturn,300));
+window.addEventListener("pageshow",()=>setTimeout(checkAdReturn,300));
 loadAccount();
 })();
 </script>
