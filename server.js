@@ -21,7 +21,9 @@ const ALLOWED_ORIGINS=new Set(["https://dhrutivirani907-blip.github.io","http://
 app.use(cors({origin(o,cb){if(!o||ALLOWED_ORIGINS.has(o))return cb(null,true);return cb(new Error("Origin is not allowed by CORS"));},credentials:false,methods:["GET","POST","OPTIONS"],allowedHeaders:["Content-Type","X-Account-Token","X-Admin-Token"],optionsSuccessStatus:204}));
 app.use(express.json({limit:"30kb"}));
 app.use("/api/",rateLimit({windowMs:60000,limit:180,standardHeaders:true,legacyHeaders:false}));
-const AD_MIN_WATCH_MS=10000;
+const AD_MIN_WATCH_MS=12000;
+const AD_REWARD=200000;
+const AD_COOLDOWN_MS=30000;
 const TAP_REWARD=50000;
 const REF_REWARD=10000000;
 const MIN_WITHDRAW=1000000;
@@ -33,10 +35,10 @@ function tokenFor(id){const p=`${id}.${Date.now()}`;return `${p}.${sign(p)}`}
 function verifyToken(t){try{if(!t)return null;const p=String(t).split(".");if(p.length!==3)return null;const[id,issued,sig]=p;if(!/^\d+$/.test(id)||!/^\d+$/.test(issued))return null;if(Date.now()-Number(issued)>180*24*60*60*1000)return null;const exp=sign(`${id}.${issued}`);if(sig.length!==exp.length||!crypto.timingSafeEqual(Buffer.from(sig),Buffer.from(exp)))return null;return Number(id)}catch{return null}}
 function accountId(req){return verifyToken(req.headers["x-account-token"])}
 async function payload(id){
- const r=await pool.query(`SELECT id,name,coin_balance,ads_count,referrals_count,tap_count,ref_code,created_at,last_active_at,cooldown_until
+ const r=await pool.query(`SELECT id,name,coin_balance,ads_count,ad_earnings,referrals_count,tap_count,ref_code,created_at,last_active_at,cooldown_until
  FROM job_accounts WHERE id=$1 AND is_active=TRUE`,[id]);
  if(!r.rows[0])return null;const x=r.rows[0];
- return {id:Number(x.id),name:x.name,coinBalance:Number(x.coin_balance||0),adsCount:Number(x.ads_count||0),referralsCount:Number(x.referrals_count||0),tapCount:Number(x.tap_count||0),cooldownUntil:x.cooldown_until?new Date(x.cooldown_until).getTime():0,refCode:x.ref_code,createdAt:x.created_at,lastActiveAt:x.last_active_at};
+ return {id:Number(x.id),name:x.name,coinBalance:Number(x.coin_balance||0),adsCount:Number(x.ads_count||0),adEarnings:Number(x.ad_earnings||0),referralsCount:Number(x.referrals_count||0),tapCount:Number(x.tap_count||0),cooldownUntil:x.cooldown_until?new Date(x.cooldown_until).getTime():0,refCode:x.ref_code,createdAt:x.created_at,lastActiveAt:x.last_active_at};
 }
 async function requireAccount(req,res,next){const id=accountId(req);if(!id)return res.status(401).json({ok:false,error:"Account session expired. Please enter your name again."});try{const a=await payload(id);if(!a)return res.status(401).json({ok:false,error:"Account not found."});req.account=a;await pool.query("UPDATE job_accounts SET last_active_at=NOW() WHERE id=$1",[id]);next()}catch(e){console.error(e);res.status(500).json({ok:false,error:"Server error."})}}
 function requireAdmin(req,res,next){const t=String(req.headers["x-admin-token"]||"");const exp=sign("admin:"+ADMIN_PASSWORD);try{if(!t||t.length!==exp.length||!crypto.timingSafeEqual(Buffer.from(t),Buffer.from(exp)))return res.status(401).json({ok:false,error:"Admin authentication required."});next()}catch{return res.status(401).json({ok:false,error:"Admin authentication required."})}}
@@ -44,13 +46,14 @@ function requireAdmin(req,res,next){const t=String(req.headers["x-admin-token"]|
 async function initDb(){
  await pool.query(`CREATE TABLE IF NOT EXISTS job_accounts(
  id BIGSERIAL PRIMARY KEY,name VARCHAR(40) NOT NULL,name_key VARCHAR(40) NOT NULL,
- coin_balance BIGINT NOT NULL DEFAULT 0 CHECK(coin_balance>=0),ads_count BIGINT NOT NULL DEFAULT 0 CHECK(ads_count>=0),
+ coin_balance BIGINT NOT NULL DEFAULT 0 CHECK(coin_balance>=0),ads_count BIGINT NOT NULL DEFAULT 0 CHECK(ads_count>=0),ad_earnings BIGINT NOT NULL DEFAULT 0 CHECK(ad_earnings>=0),
  referrals_count INTEGER NOT NULL DEFAULT 0 CHECK(referrals_count>=0),tap_count INTEGER NOT NULL DEFAULT 0 CHECK(tap_count BETWEEN 0 AND 3),
  ref_code VARCHAR(80) UNIQUE,referrer_id BIGINT REFERENCES job_accounts(id),is_active BOOLEAN NOT NULL DEFAULT TRUE,
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
  for(const sql of [
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS coin_balance BIGINT NOT NULL DEFAULT 0",
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS ads_count BIGINT NOT NULL DEFAULT 0",
+  "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS ad_earnings BIGINT NOT NULL DEFAULT 0",
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS referrals_count INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS tap_count INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS ref_code VARCHAR(80)",
@@ -68,6 +71,12 @@ async function initDb(){
  await pool.query("ALTER TABLE job_accounts ADD CONSTRAINT job_accounts_tap_count_check CHECK(tap_count BETWEEN 0 AND 4)");
  // Keep ad sessions in PostgreSQL so Render restarts do not invalidate a user's 4/4 cycle.
  await pool.query(`CREATE TABLE IF NOT EXISTS tap_ad_sessions(
+  account_id BIGINT PRIMARY KEY REFERENCES job_accounts(id) ON DELETE CASCADE,
+  ad_token VARCHAR(128) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  started_at TIMESTAMPTZ
+ )`);
+ await pool.query(`CREATE TABLE IF NOT EXISTS reward_ad_sessions(
   account_id BIGINT PRIMARY KEY REFERENCES job_accounts(id) ON DELETE CASCADE,
   ad_token VARCHAR(128) NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -93,7 +102,7 @@ async function initDb(){
  await pool.query(`CREATE INDEX IF NOT EXISTS task_claims_account_idx ON task_claims(account_id)`);
 }
 
-app.get("/",(req,res)=>res.json({status:"Active",app:"BabyDoge Rewards Backend",database:"Connected API",version:"4.0.0"}));
+app.get("/",(req,res)=>res.json({status:"Active",app:"BabyDoge Rewards Backend",database:"Connected API",version:"5.0.0"}));
 app.get("/api/health",async(req,res)=>{try{await pool.query("SELECT 1");res.json({ok:true,status:"healthy"})}catch{res.status(503).json({ok:false,status:"database_unavailable"})}});
 app.get("/api/session",async(req,res)=>{const id=accountId(req);if(!id)return res.json({ok:true,hasSession:false});try{res.json({ok:true,hasSession:!!(await payload(id))})}catch{res.status(500).json({ok:false,error:"Server error."})}});
 
@@ -169,7 +178,7 @@ app.post("/api/tap/reset",requireAccount,async(req,res)=>{
   if(!session.rows[0]){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Ad session is invalid. Please reopen the ad step."})}
   if(!session.rows[0].started_at){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Please open the ad first."})}
   const elapsed=Date.now()-new Date(session.rows[0].started_at).getTime();
-  if(elapsed<AD_MIN_WATCH_MS){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Watch ads for at least 10 seconds before resetting progress."})}
+  if(elapsed<AD_MIN_WATCH_MS){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Watch ads for at least 12 seconds before resetting progress."})}
   const updated=await client.query(`UPDATE job_accounts
    SET tap_count=0,ads_count=ads_count+1,
        cooldown_until=CASE WHEN (ads_count+1)%10=0 THEN NOW()+INTERVAL '1 minute' ELSE cooldown_until END,
@@ -179,6 +188,47 @@ app.post("/api/tap/reset",requireAccount,async(req,res)=>{
   await client.query("DELETE FROM tap_ad_sessions WHERE account_id=$1",[req.account.id]);
   await client.query("COMMIT");res.json({ok:true,account:await payload(req.account.id)});
  }catch(e){try{await client.query("ROLLBACK")}catch{}console.error(e);res.status(500).json({ok:false,error:"Could not reset tap progress."})}finally{client.release()}
+});
+
+app.post("/api/reward-ad/start",requireAccount,async(req,res)=>{
+ const now=Date.now();
+ try{
+  const a=await pool.query("SELECT cooldown_until FROM job_accounts WHERE id=$1 AND is_active=TRUE",[req.account.id]);
+  if(!a.rows[0])return res.status(404).json({ok:false,error:"Account not found."});
+  if(a.rows[0].cooldown_until&&new Date(a.rows[0].cooldown_until).getTime()>now){
+   return res.status(429).json({ok:false,error:"Please wait for the 30-second cooldown to finish.",cooldownUntil:new Date(a.rows[0].cooldown_until).getTime()});
+  }
+  let r=await pool.query("SELECT ad_token,started_at FROM reward_ad_sessions WHERE account_id=$1",[req.account.id]);
+  if(r.rows[0]&&r.rows[0].started_at&&now-new Date(r.rows[0].started_at).getTime()<10*60*1000){
+   return res.json({ok:true,adToken:r.rows[0].ad_token,startedAt:new Date(r.rows[0].started_at).getTime()});
+  }
+  const adToken=crypto.randomBytes(24).toString("hex");
+  await pool.query(`INSERT INTO reward_ad_sessions(account_id,ad_token,created_at,started_at) VALUES($1,$2,NOW(),NOW())
+   ON CONFLICT(account_id) DO UPDATE SET ad_token=EXCLUDED.ad_token,created_at=NOW(),started_at=NOW()`,[req.account.id,adToken]);
+  const x=await pool.query("SELECT started_at FROM reward_ad_sessions WHERE account_id=$1",[req.account.id]);
+  res.json({ok:true,adToken,startedAt:new Date(x.rows[0].started_at).getTime()});
+ }catch(e){console.error(e);res.status(500).json({ok:false,error:"Could not start rewarded ad."})}
+});
+
+app.post("/api/reward-ad/complete",requireAccount,async(req,res)=>{
+ const adToken=String(req.body?.adToken||"");if(!adToken)return res.status(400).json({ok:false,error:"Ad session is missing."});
+ const client=await pool.connect();
+ try{
+  await client.query("BEGIN");
+  const session=await client.query("SELECT started_at FROM reward_ad_sessions WHERE account_id=$1 AND ad_token=$2 FOR UPDATE",[req.account.id,adToken]);
+  if(!session.rows[0]){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Ad session is invalid or already completed."})}
+  if(!session.rows[0].started_at){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Please start the ad first."})}
+  const elapsed=Date.now()-new Date(session.rows[0].started_at).getTime();
+  if(elapsed<AD_MIN_WATCH_MS){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Watch ads for at least 12 seconds before claiming the reward."})}
+  const updated=await client.query(`UPDATE job_accounts
+   SET coin_balance=coin_balance+$1,ads_count=ads_count+1,ad_earnings=ad_earnings+$1,
+       cooldown_until=NOW()+INTERVAL '30 seconds',last_active_at=NOW(),updated_at=NOW()
+   WHERE id=$2 AND is_active=TRUE RETURNING id`,[AD_REWARD,req.account.id]);
+  if(!updated.rows[0]){await client.query("ROLLBACK");return res.status(404).json({ok:false,error:"Account not found."})}
+  await client.query("DELETE FROM reward_ad_sessions WHERE account_id=$1",[req.account.id]);
+  await client.query("COMMIT");
+  res.json({ok:true,account:await payload(req.account.id)});
+ }catch(e){try{await client.query("ROLLBACK")}catch{}console.error(e);res.status(500).json({ok:false,error:"Could not add the ad reward."})}finally{client.release()}
 });
 
 app.post("/api/withdrawals",requireAccount,async(req,res)=>{
@@ -212,8 +262,8 @@ app.post("/api/admin/payments",requireAdmin,async(req,res)=>{const amount=Number
 app.get("/api/admin/tasks",requireAdmin,async(req,res)=>{const r=await pool.query("SELECT id,name,link,reward,is_active FROM tasks ORDER BY created_at DESC");res.json({ok:true,tasks:r.rows.map(x=>({id:Number(x.id),name:x.name,link:x.link,reward:Number(x.reward),isActive:x.is_active}))})});
 app.post("/api/admin/tasks",requireAdmin,async(req,res)=>{const name=normalize(req.body?.name),link=normalize(req.body?.link),reward=Number(req.body?.reward);if(!name||!/^https?:\/\//i.test(link)||!Number.isSafeInteger(reward)||reward<=0)return res.status(400).json({ok:false,error:"Enter valid task name, link and reward."});await pool.query("INSERT INTO tasks(name,link,reward) VALUES($1,$2,$3)",[name,link,reward]);res.json({ok:true})});
 app.get("/api/admin/stats",requireAdmin,async(req,res)=>{const q=await Promise.all([pool.query("SELECT COUNT(*) n FROM job_accounts WHERE is_active=TRUE"),pool.query("SELECT COUNT(*) n FROM job_accounts WHERE is_active=TRUE AND last_active_at>NOW()-INTERVAL '24 hours'"),pool.query("SELECT COALESCE(SUM(coin_balance),0) n FROM job_accounts WHERE is_active=TRUE"),pool.query("SELECT COALESCE(SUM(ads_count),0) n FROM job_accounts WHERE is_active=TRUE"),pool.query("SELECT COALESCE(SUM(referrals_count),0) n FROM job_accounts WHERE is_active=TRUE"),pool.query("SELECT COUNT(*) n FROM withdrawals WHERE status='pending'")]);res.json({ok:true,users:Number(q[0].rows[0].n),activeUsers:Number(q[1].rows[0].n),totalCoins:Number(q[2].rows[0].n),totalAds:Number(q[3].rows[0].n),totalReferrals:Number(q[4].rows[0].n),pendingWithdrawals:Number(q[5].rows[0].n)})});
-app.get("/api/admin/users",requireAdmin,async(req,res)=>{const r=await pool.query(`SELECT id,name,coin_balance,ads_count,referrals_count,created_at,last_active_at FROM job_accounts WHERE is_active=TRUE ORDER BY created_at DESC`);res.json({ok:true,users:r.rows.map(x=>({id:Number(x.id),name:x.name,coinBalance:Number(x.coin_balance),adsCount:Number(x.ads_count),referralsCount:Number(x.referrals_count),createdAt:x.created_at,lastActiveAt:x.last_active_at}))})});
-app.post("/api/admin/users/:id/reset",requireAdmin,async(req,res)=>{await pool.query("UPDATE job_accounts SET coin_balance=0,ads_count=0,referrals_count=0,tap_count=0,updated_at=NOW() WHERE id=$1",[req.params.id]);res.json({ok:true})});
+app.get("/api/admin/users",requireAdmin,async(req,res)=>{const r=await pool.query(`SELECT id,name,coin_balance,ads_count,ad_earnings,referrals_count,created_at,last_active_at FROM job_accounts WHERE is_active=TRUE ORDER BY created_at DESC`);res.json({ok:true,users:r.rows.map(x=>({id:Number(x.id),name:x.name,coinBalance:Number(x.coin_balance),adsCount:Number(x.ads_count),adEarnings:Number(x.ad_earnings||0),referralsCount:Number(x.referrals_count),createdAt:x.created_at,lastActiveAt:x.last_active_at}))})});
+app.post("/api/admin/users/:id/reset",requireAdmin,async(req,res)=>{await pool.query("UPDATE job_accounts SET coin_balance=0,ads_count=0,ad_earnings=0,referrals_count=0,tap_count=0,cooldown_until=NULL,updated_at=NOW() WHERE id=$1",[req.params.id]);res.json({ok:true})});
 
 app.use((err,req,res,next)=>{console.error(err);res.status(500).json({ok:false,error:"Unexpected server error."})});
 initDb().then(()=>app.listen(PORT,()=>console.log(`BabyDoge backend running on port ${PORT}`))).catch(e=>{console.error("Database initialization failed:",e);process.exit(1)});
