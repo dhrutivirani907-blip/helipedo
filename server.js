@@ -22,11 +22,11 @@ app.use(cors({origin(o,cb){if(!o||ALLOWED_ORIGINS.has(o))return cb(null,true);re
 app.use(express.json({limit:"30kb"}));
 app.use("/api/",rateLimit({windowMs:60000,limit:180,standardHeaders:true,legacyHeaders:false}));
 const AD_MIN_WATCH_MS=12000;
-const AD_REWARD=200000;
+const AD_REWARD=30;
 const AD_COOLDOWN_MS=30000;
 const TAP_REWARD=50000;
-const REF_REWARD=10000000;
-const MIN_WITHDRAW=1000000;
+const REF_REWARD=500;
+const MIN_WITHDRAW=500;
 
 function normalize(v){return String(v??"").trim().replace(/\s+/g," ")}
 function validName(v){return v.length>=2&&v.length<=40&&/^[\p{L}\p{N} ._-]+$/u.test(v)}
@@ -95,6 +95,7 @@ async function initDb(){
  id BIGSERIAL PRIMARY KEY,task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
  account_id BIGINT NOT NULL REFERENCES job_accounts(id) ON DELETE CASCADE,claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  UNIQUE(task_id,account_id))`);
+ await pool.query("UPDATE tasks SET reward=200 WHERE reward=3000000");
  await pool.query(`CREATE TABLE IF NOT EXISTS live_payments(
  id BIGSERIAL PRIMARY KEY,amount BIGINT NOT NULL CHECK(amount>0),channel_link TEXT NOT NULL DEFAULT 'https://t.me/bonk_taping',
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
@@ -102,7 +103,7 @@ async function initDb(){
  await pool.query(`CREATE INDEX IF NOT EXISTS task_claims_account_idx ON task_claims(account_id)`);
 }
 
-app.get("/",(req,res)=>res.json({status:"Active",app:"BabyDoge Rewards Backend",database:"Connected API",version:"5.0.0"}));
+app.get("/",(req,res)=>res.json({status:"Active",app:"BONK Rewards Backend",database:"Connected API",version:"5.0.0"}));
 app.get("/api/health",async(req,res)=>{try{await pool.query("SELECT 1");res.json({ok:true,status:"healthy"})}catch{res.status(503).json({ok:false,status:"database_unavailable"})}});
 app.get("/api/session",async(req,res)=>{const id=accountId(req);if(!id)return res.json({ok:true,hasSession:false});try{res.json({ok:true,hasSession:!!(await payload(id))})}catch{res.status(500).json({ok:false,error:"Server error."})}});
 
@@ -178,7 +179,7 @@ app.post("/api/tap/reset",requireAccount,async(req,res)=>{
   if(!session.rows[0]){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Ad session is invalid. Please reopen the ad step."})}
   if(!session.rows[0].started_at){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Please open the ad first."})}
   const elapsed=Date.now()-new Date(session.rows[0].started_at).getTime();
-  if(elapsed<AD_MIN_WATCH_MS){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Watch ads for at least 12 seconds before resetting progress."})}
+  if(elapsed<AD_MIN_WATCH_MS){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Watch ads for at least 10 seconds before resetting progress."})}
   const updated=await client.query(`UPDATE job_accounts
    SET tap_count=0,ads_count=ads_count+1,
        cooldown_until=CASE WHEN (ads_count+1)%10=0 THEN NOW()+INTERVAL '1 minute' ELSE cooldown_until END,
@@ -234,9 +235,9 @@ app.post("/api/reward-ad/complete",requireAccount,async(req,res)=>{
 app.post("/api/withdrawals",requireAccount,async(req,res)=>{
  const binanceId=normalize(req.body?.binanceId),amount=Number(req.body?.amount);
  if(!binanceId||binanceId.length>120)return res.status(400).json({ok:false,error:"Enter a valid Binance ID."});
- if(!Number.isSafeInteger(amount)||amount<MIN_WITHDRAW)return res.status(400).json({ok:false,error:"Minimum withdrawal is 1,000,000 BabyDoge."});
+ if(!Number.isSafeInteger(amount)||amount<MIN_WITHDRAW)return res.status(400).json({ok:false,error:"Minimum withdrawal is 500 BONK."});
  const client=await pool.connect();
- try{await client.query("BEGIN");const r=await client.query("UPDATE job_accounts SET coin_balance=coin_balance-$1,updated_at=NOW() WHERE id=$2 AND coin_balance >= $1 RETURNING id",[amount,req.account.id]);if(!r.rows[0]){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Insufficient BabyDoge balance."})}
+ try{await client.query("BEGIN");const r=await client.query("UPDATE job_accounts SET coin_balance=coin_balance-$1,updated_at=NOW() WHERE id=$2 AND coin_balance >= $1 RETURNING id",[amount,req.account.id]);if(!r.rows[0]){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Insufficient BONK balance."})}
  await client.query("INSERT INTO withdrawals(account_id,binance_id,amount) VALUES($1,$2,$3)",[req.account.id,binanceId,amount]);await client.query("COMMIT");res.json({ok:true,account:await payload(req.account.id)})}
  catch(e){try{await client.query("ROLLBACK")}catch{}console.error(e);res.status(500).json({ok:false,error:"Could not submit withdrawal."})}finally{client.release()}
 });
@@ -250,15 +251,13 @@ app.post("/api/tasks/:id/claim",requireAccount,async(req,res)=>{
  const reward=Number(t.rows[0].reward);await client.query("INSERT INTO task_claims(task_id,account_id) VALUES($1,$2)",[id,req.account.id]);await client.query("UPDATE job_accounts SET coin_balance=coin_balance+$1,updated_at=NOW() WHERE id=$2",[reward,req.account.id]);await client.query("COMMIT");res.json({ok:true,account:await payload(req.account.id)})}
  catch(e){try{await client.query("ROLLBACK")}catch{}console.error(e);res.status(500).json({ok:false,error:"Could not claim task."})}finally{client.release()}
 });
-app.get("/api/payments",requireAccount,async(req,res)=>{try{const r=await pool.query("SELECT id,amount,channel_link,created_at FROM live_payments ORDER BY created_at DESC LIMIT 50");res.json({ok:true,items:r.rows.map(x=>({id:Number(x.id),amount:Number(x.amount),channelLink:x.channel_link,createdAt:x.created_at}))})}catch{res.status(500).json({ok:false,error:"Could not load payments."})}});
+app.get("/api/payments",requireAccount,async(req,res)=>{res.json({ok:true,items:[]})});
 
 app.post("/api/admin/login",rateLimit({windowMs:10*60*1000,limit:20}),async(req,res)=>{const p=String(req.body?.password||"");const a=Buffer.from(p),b=Buffer.from(ADMIN_PASSWORD);if(!p||a.length!==b.length||!crypto.timingSafeEqual(a,b))return res.status(401).json({ok:false,error:"Incorrect admin password."});res.json({ok:true,adminToken:sign("admin:"+ADMIN_PASSWORD)})});
 app.get("/api/admin/withdrawals",requireAdmin,async(req,res)=>{const r=await pool.query(`SELECT w.id,w.binance_id,w.amount,w.status,w.created_at,a.name FROM withdrawals w JOIN job_accounts a ON a.id=w.account_id ORDER BY w.created_at DESC`);res.json({ok:true,items:r.rows.map(x=>({id:Number(x.id),name:x.name,binanceId:x.binance_id,amount:Number(x.amount),status:x.status,createdAt:x.created_at}))})});
 app.post("/api/admin/withdrawals/:id",requireAdmin,async(req,res)=>{const status=String(req.body?.status||"");if(!["pending","completed","rejected"].includes(status))return res.status(400).json({ok:false,error:"Invalid status."});const client=await pool.connect();try{await client.query("BEGIN");const w=await client.query("SELECT account_id,amount,status FROM withdrawals WHERE id=$1 FOR UPDATE",[req.params.id]);if(!w.rows[0]){await client.query("ROLLBACK");return res.status(404).json({ok:false,error:"Withdrawal not found."})}
  const old=w.rows[0].status;if(old!==status){if(old==="pending"&&status==="rejected")await client.query("UPDATE job_accounts SET coin_balance=coin_balance+$1 WHERE id=$2",[w.rows[0].amount,w.rows[0].account_id]);if(old==="rejected"&&status==="pending")await client.query("UPDATE job_accounts SET coin_balance=coin_balance-$1 WHERE id=$2 AND coin_balance >= $1",[w.rows[0].amount,w.rows[0].account_id]);}
  await client.query("UPDATE withdrawals SET status=$1,updated_at=NOW() WHERE id=$2",[status,req.params.id]);await client.query("COMMIT");res.json({ok:true})}catch(e){try{await client.query("ROLLBACK")}catch{}res.status(500).json({ok:false,error:"Could not update withdrawal."})}finally{client.release()}});
-app.get("/api/admin/payments",requireAdmin,async(req,res)=>{const r=await pool.query("SELECT id,amount,channel_link,created_at FROM live_payments ORDER BY created_at DESC LIMIT 100");res.json({ok:true,items:r.rows.map(x=>({id:Number(x.id),amount:Number(x.amount),channelLink:x.channel_link,createdAt:x.created_at}))})});
-app.post("/api/admin/payments",requireAdmin,async(req,res)=>{const amount=Number(req.body?.amount),link=normalize(req.body?.channelLink)||"https://t.me/bonk_taping";if(!Number.isSafeInteger(amount)||amount<=0)return res.status(400).json({ok:false,error:"Enter a valid payment amount."});await pool.query("INSERT INTO live_payments(amount,channel_link) VALUES($1,$2)",[amount,link]);res.json({ok:true})});
 app.get("/api/admin/tasks",requireAdmin,async(req,res)=>{const r=await pool.query("SELECT id,name,link,reward,is_active FROM tasks ORDER BY created_at DESC");res.json({ok:true,tasks:r.rows.map(x=>({id:Number(x.id),name:x.name,link:x.link,reward:Number(x.reward),isActive:x.is_active}))})});
 app.post("/api/admin/tasks",requireAdmin,async(req,res)=>{const name=normalize(req.body?.name),link=normalize(req.body?.link),reward=Number(req.body?.reward);if(!name||!/^https?:\/\//i.test(link)||!Number.isSafeInteger(reward)||reward<=0)return res.status(400).json({ok:false,error:"Enter valid task name, link and reward."});await pool.query("INSERT INTO tasks(name,link,reward) VALUES($1,$2,$3)",[name,link,reward]);res.json({ok:true})});
 app.get("/api/admin/stats",requireAdmin,async(req,res)=>{const q=await Promise.all([pool.query("SELECT COUNT(*) n FROM job_accounts WHERE is_active=TRUE"),pool.query("SELECT COUNT(*) n FROM job_accounts WHERE is_active=TRUE AND last_active_at>NOW()-INTERVAL '24 hours'"),pool.query("SELECT COALESCE(SUM(coin_balance),0) n FROM job_accounts WHERE is_active=TRUE"),pool.query("SELECT COALESCE(SUM(ads_count),0) n FROM job_accounts WHERE is_active=TRUE"),pool.query("SELECT COALESCE(SUM(referrals_count),0) n FROM job_accounts WHERE is_active=TRUE"),pool.query("SELECT COUNT(*) n FROM withdrawals WHERE status='pending'")]);res.json({ok:true,users:Number(q[0].rows[0].n),activeUsers:Number(q[1].rows[0].n),totalCoins:Number(q[2].rows[0].n),totalAds:Number(q[3].rows[0].n),totalReferrals:Number(q[4].rows[0].n),pendingWithdrawals:Number(q[5].rows[0].n)})});
@@ -266,4 +265,4 @@ app.get("/api/admin/users",requireAdmin,async(req,res)=>{const r=await pool.quer
 app.post("/api/admin/users/:id/reset",requireAdmin,async(req,res)=>{await pool.query("UPDATE job_accounts SET coin_balance=0,ads_count=0,ad_earnings=0,referrals_count=0,tap_count=0,cooldown_until=NULL,updated_at=NOW() WHERE id=$1",[req.params.id]);res.json({ok:true})});
 
 app.use((err,req,res,next)=>{console.error(err);res.status(500).json({ok:false,error:"Unexpected server error."})});
-initDb().then(()=>app.listen(PORT,()=>console.log(`BabyDoge backend running on port ${PORT}`))).catch(e=>{console.error("Database initialization failed:",e);process.exit(1)});
+initDb().then(()=>app.listen(PORT,()=>console.log(`BONK backend running on port ${PORT}`))).catch(e=>{console.error("Database initialization failed:",e);process.exit(1)});
