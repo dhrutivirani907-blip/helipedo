@@ -60,12 +60,18 @@ async function initDb(){
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS referrer_id BIGINT",
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS daily_ads_count INTEGER NOT NULL DEFAULT 0",
-  "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS daily_ads_date DATE",
+  "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS daily_ads_date DATE NOT NULL DEFAULT CURRENT_DATE",
   "ALTER TABLE job_accounts ADD COLUMN IF NOT EXISTS cooldown_until TIMESTAMPTZ"
  ]){try{await pool.query(sql)}catch(e){if(!String(e.message).includes("already exists"))throw e}}
  // Allow multiple accounts to use the same display name. Remove the legacy unique constraint.
  await pool.query("ALTER TABLE job_accounts DROP CONSTRAINT IF EXISTS job_accounts_name_key_key");
  await pool.query("DROP INDEX IF EXISTS job_accounts_name_key_key");
+ // Fix legacy BabyDoge database constraints before the BONK migration runs.
+ await pool.query("ALTER TABLE job_accounts ALTER COLUMN daily_ads_date SET DEFAULT CURRENT_DATE");
+ await pool.query("UPDATE job_accounts SET daily_ads_date=CURRENT_DATE WHERE daily_ads_date IS NULL");
+ await pool.query("ALTER TABLE job_accounts ALTER COLUMN daily_ads_date SET NOT NULL");
+ await pool.query("ALTER TABLE withdrawals DROP CONSTRAINT IF EXISTS withdrawals_amount_check");
+ await pool.query("ALTER TABLE withdrawals ADD CONSTRAINT withdrawals_amount_check CHECK(amount>=500)");
  // The fourth tap is a valid state while the user completes the ad step.
  await pool.query("ALTER TABLE job_accounts DROP CONSTRAINT IF EXISTS job_accounts_tap_count_check");
  await pool.query("ALTER TABLE job_accounts ADD CONSTRAINT job_accounts_tap_count_check CHECK(tap_count BETWEEN 0 AND 4)");
@@ -85,7 +91,7 @@ async function initDb(){
  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS job_accounts_ref_code_idx ON job_accounts(ref_code) WHERE ref_code IS NOT NULL`);
  await pool.query(`CREATE TABLE IF NOT EXISTS withdrawals(
  id BIGSERIAL PRIMARY KEY,account_id BIGINT NOT NULL REFERENCES job_accounts(id) ON DELETE CASCADE,
- binance_id VARCHAR(120) NOT NULL,amount BIGINT NOT NULL CHECK(amount>=1000000),
+ binance_id VARCHAR(120) NOT NULL,amount BIGINT NOT NULL CHECK(amount>=500),
  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','completed','rejected')),
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
  await pool.query(`CREATE TABLE IF NOT EXISTS tasks(
@@ -110,7 +116,7 @@ async function initDb(){
   const client=await pool.connect();
   try{
    await client.query("BEGIN");
-   await client.query(`UPDATE job_accounts SET coin_balance=0,ads_count=0,ad_earnings=0,referrals_count=0,tap_count=0,daily_ads_count=0,daily_ads_date=NULL,cooldown_until=NULL,updated_at=NOW()`);
+   await client.query(`UPDATE job_accounts SET coin_balance=0,ads_count=0,ad_earnings=0,referrals_count=0,tap_count=0,daily_ads_count=0,daily_ads_date=CURRENT_DATE,cooldown_until=NULL,updated_at=NOW()`);
    await client.query("DELETE FROM reward_ad_sessions");
    await client.query("DELETE FROM tap_ad_sessions");
    await client.query("DELETE FROM task_claims");
