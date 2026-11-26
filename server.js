@@ -24,7 +24,7 @@ app.use("/api/",rateLimit({windowMs:60000,limit:180,standardHeaders:true,legacyH
 const AD_MIN_WATCH_MS=12000;
 const AD_REWARD=30;
 const AD_COOLDOWN_MS=30000;
-const TAP_REWARD=50000;
+const TAP_REWARD=0;
 const REF_REWARD=500;
 const MIN_WITHDRAW=500;
 
@@ -101,6 +101,26 @@ async function initDb(){
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
  await pool.query(`CREATE INDEX IF NOT EXISTS withdrawals_account_idx ON withdrawals(account_id,created_at DESC)`);
  await pool.query(`CREATE INDEX IF NOT EXISTS task_claims_account_idx ON task_claims(account_id)`);
+ // One-time BONK conversion migration: preserve accounts/referral codes, reset old BabyDoge earning state.
+ await pool.query(`CREATE TABLE IF NOT EXISTS app_migrations(
+  key VARCHAR(120) PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+ )`);
+ const migration=await pool.query("SELECT 1 FROM app_migrations WHERE key=$1",["bonk_conversion_reset_v1"]);
+ if(!migration.rows[0]){
+  const client=await pool.connect();
+  try{
+   await client.query("BEGIN");
+   await client.query(`UPDATE job_accounts SET coin_balance=0,ads_count=0,ad_earnings=0,referrals_count=0,tap_count=0,daily_ads_count=0,daily_ads_date=NULL,cooldown_until=NULL,updated_at=NOW()`);
+   await client.query("DELETE FROM reward_ad_sessions");
+   await client.query("DELETE FROM tap_ad_sessions");
+   await client.query("DELETE FROM task_claims");
+   await client.query("DELETE FROM withdrawals");
+   await client.query("DELETE FROM live_payments");
+   await client.query("INSERT INTO app_migrations(key) VALUES($1)",["bonk_conversion_reset_v1"]);
+   await client.query("COMMIT");
+   console.log("BONK conversion migration applied: old BabyDoge earning state reset.");
+  }catch(e){try{await client.query("ROLLBACK")}catch{}throw e}finally{client.release()}
+ }
 }
 
 app.get("/",(req,res)=>res.json({status:"Active",app:"BONK Rewards Backend",database:"Connected API",version:"5.0.0"}));
